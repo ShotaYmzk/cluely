@@ -45,6 +45,7 @@ declare global {
 
       moveWindowLeft: () => Promise<void>
       moveWindowRight: () => Promise<void>
+      moveWindow: (deltaX: number, deltaY: number) => Promise<void>
       quitApp: () => Promise<void>
     }
   }

@@ -14,6 +14,7 @@ import {
 } from "../components/ui/toast"
 import ExtraScreenshotsQueueHelper from "../components/Solutions/SolutionCommands"
 import { diffLines } from "diff"
+import DraggableArea from "../components/ui/DraggableArea"
 
 type DiffLine = {
   value: string
@@ -111,7 +112,7 @@ const CodeComparisonSection = ({
         <div className="space-y-1">
           <div className="mt-3 flex">
             <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-              Loading code comparison...
+              コード比較を読み込み中...
             </p>
           </div>
         </div>
@@ -121,7 +122,7 @@ const CodeComparisonSection = ({
           <div className="w-1/2 border-r border-gray-700">
             <div className="bg-[#2d333b] px-3 py-1.5">
               <h3 className="text-[11px] font-medium text-gray-200">
-                Previous Version
+                前のバージョン
               </h3>
             </div>
             <div className="p-3 overflow-x-auto">
@@ -158,7 +159,7 @@ const CodeComparisonSection = ({
           <div className="w-1/2">
             <div className="bg-[#2d333b] px-3 py-1.5">
               <h3 className="text-[11px] font-medium text-gray-200">
-                New Version
+                新しいバージョン
               </h3>
             </div>
             <div className="p-3 overflow-x-auto">
@@ -232,7 +233,7 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
         const existing = await window.electronAPI.getScreenshots()
         return existing
       } catch (error) {
-        console.error("Error loading extra screenshots:", error)
+        console.error("追加スクリーンショットの読み込みエラー:", error)
         return []
       }
     },
@@ -260,10 +261,10 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
       if (response.success) {
         refetch()
       } else {
-        console.error("Failed to delete extra screenshot:", response.error)
+        console.error("追加スクリーンショットの削除に失敗:", response.error)
       }
     } catch (error) {
-      console.error("Error deleting extra screenshot:", error)
+      console.error("追加スクリーンショット削除エラー:", error)
     }
   }
 
@@ -299,12 +300,12 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
       }),
       window.electronAPI.onDebugError((error: string) => {
         showToast(
-          "Processing Failed",
-          "There was an error debugging your code.",
+          "処理失敗",
+          "コードのデバッグ中にエラーが発生しました。",
           "error"
         )
         setIsProcessing(false)
-        console.error("Processing error:", error)
+        console.error("処理エラー:", error)
       })
     ]
 
@@ -341,77 +342,79 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
   }
 
   return (
-    <div ref={contentRef} className="relative space-y-3 px-4 py-3 ">
-      <Toast
-        open={toastOpen}
-        onOpenChange={setToastOpen}
-        variant={toastMessage.variant}
-        duration={3000}
-      >
-        <ToastTitle>{toastMessage.title}</ToastTitle>
-        <ToastDescription>{toastMessage.description}</ToastDescription>
-      </Toast>
+    <DraggableArea className="w-full h-full">
+      <div ref={contentRef} className="relative space-y-3 px-4 py-3 ">
+        <Toast
+          open={toastOpen}
+          onOpenChange={setToastOpen}
+          variant={toastMessage.variant}
+          duration={3000}
+        >
+          <ToastTitle>{toastMessage.title}</ToastTitle>
+          <ToastDescription>{toastMessage.description}</ToastDescription>
+        </Toast>
 
-      {/* Conditionally render the screenshot queue */}
-      <div className="bg-transparent w-fit">
-        <div className="pb-3">
-          <div className="space-y-3 w-fit">
-            <ScreenshotQueue
-              screenshots={extraScreenshots}
-              onDeleteScreenshot={handleDeleteExtraScreenshot}
-              isLoading={isProcessing}
-            />
+        {/* Conditionally render the screenshot queue */}
+        <div className="bg-transparent w-fit">
+          <div className="pb-3">
+            <div className="space-y-3 w-fit">
+              <ScreenshotQueue
+                screenshots={extraScreenshots}
+                onDeleteScreenshot={handleDeleteExtraScreenshot}
+                isLoading={isProcessing}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Navbar of commands with the tooltip */}
-      <ExtraScreenshotsQueueHelper
-        extraScreenshots={extraScreenshots}
-        onTooltipVisibilityChange={handleTooltipVisibilityChange}
-      />
+        {/* Navbar of commands with the tooltip */}
+        <ExtraScreenshotsQueueHelper
+          extraScreenshots={extraScreenshots}
+          onTooltipVisibilityChange={handleTooltipVisibilityChange}
+        />
 
-      {/* Main Content */}
-      <div className="w-full text-sm text-black bg-black/60 rounded-md">
-        <div className="rounded-lg overflow-hidden">
-          <div className="px-4 py-3 space-y-4">
-            {/* Thoughts Section */}
-            <ContentSection
-              title="What I Changed"
-              content={
-                thoughtsData && (
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      {thoughtsData.map((thought, index) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
-                          <div>{thought}</div>
-                        </div>
-                      ))}
+        {/* Main Content */}
+        <div className="w-full text-sm text-black bg-black/60 rounded-md">
+          <div className="rounded-lg overflow-hidden">
+            <div className="px-4 py-3 space-y-4">
+              {/* Thoughts Section */}
+              <ContentSection
+                title="変更内容"
+                content={
+                  thoughtsData && (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        {thoughtsData.map((thought, index) => (
+                          <div key={index} className="flex items-start gap-2">
+                            <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
+                            <div>{thought}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )
-              }
-              isLoading={!thoughtsData}
-            />
+                  )
+                }
+                isLoading={!thoughtsData}
+              />
 
-            {/* Code Comparison Section */}
-            <CodeComparisonSection
-              oldCode={oldCode}
-              newCode={newCode}
-              isLoading={!oldCode || !newCode}
-            />
+              {/* Code Comparison Section */}
+              <CodeComparisonSection
+                oldCode={oldCode}
+                newCode={newCode}
+                isLoading={!oldCode || !newCode}
+              />
 
-            {/* Complexity Section */}
-            <ComplexitySection
-              timeComplexity={timeComplexityData}
-              spaceComplexity={spaceComplexityData}
-              isLoading={!timeComplexityData || !spaceComplexityData}
-            />
+              {/* Complexity Section */}
+              <ComplexitySection
+                timeComplexity={timeComplexityData}
+                spaceComplexity={spaceComplexityData}
+                isLoading={!timeComplexityData || !spaceComplexityData}
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </DraggableArea>
   )
 }
 

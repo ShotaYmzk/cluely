@@ -8,7 +8,7 @@ const generative_ai_1 = require("@google/generative-ai");
 const fs_1 = __importDefault(require("fs"));
 class LLMHelper {
     model;
-    systemPrompt = `You are Wingman AI, a helpful, proactive assistant for any kind of problem or situation (not just coding). For any user input, analyze the situation, provide a clear problem statement, relevant context, and suggest several possible responses or actions the user could take next. Always explain your reasoning. Present your suggestions as a list of options or next steps.`;
+    systemPrompt = `あなたはWingman AIです。どんな問題や状況（コーディングに限らず）でも役立つ、積極的なアシスタントです。ユーザーの入力に対して、状況を分析し、明確な問題文、関連するコンテキスト、そしてユーザーが次に取れる可能性のある複数の回答やアクションを提案します。常に推論を説明し、提案をオプションや次のステップのリストとして提示してください。日本語で回答してください。`;
     constructor(apiKey) {
         const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
         this.model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -32,68 +32,68 @@ class LLMHelper {
     async extractProblemFromImages(imagePaths) {
         try {
             const imageParts = await Promise.all(imagePaths.map(path => this.fileToGenerativePart(path)));
-            const prompt = `${this.systemPrompt}\n\nYou are a wingman. Please analyze these images and extract the following information in JSON format:\n{
-  "problem_statement": "A clear statement of the problem or situation depicted in the images.",
-  "context": "Relevant background or context from the images.",
-  "suggested_responses": ["First possible answer or action", "Second possible answer or action", "..."],
-  "reasoning": "Explanation of why these suggestions are appropriate."
-}\nImportant: Return ONLY the JSON object, without any markdown formatting or code blocks.`;
+            const prompt = `${this.systemPrompt}\n\nこれらの画像を分析して、以下の情報をJSON形式で抽出してください：\n{
+  "problem_statement": "画像に描かれている問題や状況の明確な説明",
+  "context": "画像からの関連する背景やコンテキスト",
+  "suggested_responses": ["最初の可能な回答やアクション", "2番目の可能な回答やアクション", "..."],
+  "reasoning": "これらの提案が適切である理由の説明"
+}\n重要：JSONオブジェクトのみを返してください。マークダウン形式やコードブロックは含めないでください。`;
             const result = await this.model.generateContent([prompt, ...imageParts]);
             const response = await result.response;
             const text = this.cleanJsonResponse(response.text());
             return JSON.parse(text);
         }
         catch (error) {
-            console.error("Error extracting problem from images:", error);
+            console.error("画像からの問題抽出でエラーが発生しました:", error);
             throw error;
         }
     }
     async generateSolution(problemInfo) {
-        const prompt = `${this.systemPrompt}\n\nGiven this problem or situation:\n${JSON.stringify(problemInfo, null, 2)}\n\nPlease provide your response in the following JSON format:\n{
+        const prompt = `${this.systemPrompt}\n\nこの問題や状況について：\n${JSON.stringify(problemInfo, null, 2)}\n\n以下のJSON形式で回答を提供してください：\n{
   "solution": {
-    "code": "The code or main answer here.",
-    "problem_statement": "Restate the problem or situation.",
-    "context": "Relevant background/context.",
-    "suggested_responses": ["First possible answer or action", "Second possible answer or action", "..."],
-    "reasoning": "Explanation of why these suggestions are appropriate."
+    "code": "コードまたはメインの回答をここに記述",
+    "problem_statement": "問題や状況を再記述",
+    "context": "関連する背景/コンテキスト",
+    "suggested_responses": ["最初の可能な回答やアクション", "2番目の可能な回答やアクション", "..."],
+    "reasoning": "これらの提案が適切である理由の説明"
   }
-}\nImportant: Return ONLY the JSON object, without any markdown formatting or code blocks.`;
-        console.log("[LLMHelper] Calling Gemini LLM for solution...");
+}\n重要：JSONオブジェクトのみを返してください。マークダウン形式やコードブロックは含めないでください。`;
+        console.log("[LLMHelper] Gemini LLMにソリューション生成を要求中...");
         try {
             const result = await this.model.generateContent(prompt);
-            console.log("[LLMHelper] Gemini LLM returned result.");
+            console.log("[LLMHelper] Gemini LLMが結果を返しました。");
             const response = await result.response;
             const text = this.cleanJsonResponse(response.text());
             const parsed = JSON.parse(text);
-            console.log("[LLMHelper] Parsed LLM response:", parsed);
+            console.log("[LLMHelper] 解析されたLLM応答:", parsed);
             return parsed;
         }
         catch (error) {
-            console.error("[LLMHelper] Error in generateSolution:", error);
+            console.error("[LLMHelper] generateSolutionでエラーが発生しました:", error);
             throw error;
         }
     }
     async debugSolutionWithImages(problemInfo, currentCode, debugImagePaths) {
         try {
             const imageParts = await Promise.all(debugImagePaths.map(path => this.fileToGenerativePart(path)));
-            const prompt = `${this.systemPrompt}\n\nYou are a wingman. Given:\n1. The original problem or situation: ${JSON.stringify(problemInfo, null, 2)}\n2. The current response or approach: ${currentCode}\n3. The debug information in the provided images\n\nPlease analyze the debug information and provide feedback in this JSON format:\n{
+            const prompt = `${this.systemPrompt}\n\n以下が与えられています：\n1. 元の問題や状況: ${JSON.stringify(problemInfo, null, 2)}\n2. 現在の回答やアプローチ: ${currentCode}\n3. 提供された画像のデバッグ情報\n\nデバッグ情報を分析し、以下のJSON形式でフィードバックを提供してください：\n{
   "solution": {
-    "code": "The code or main answer here.",
-    "problem_statement": "Restate the problem or situation.",
-    "context": "Relevant background/context.",
-    "suggested_responses": ["First possible answer or action", "Second possible answer or action", "..."],
-    "reasoning": "Explanation of why these suggestions are appropriate."
+    "code": "コードまたはメインの回答をここに記述",
+    "problem_statement": "問題や状況を再記述",
+    "context": "関連する背景/コンテキスト",
+    "suggested_responses": ["最初の可能な回答やアクション", "2番目の可能な回答やアクション", "..."],
+    "reasoning": "これらの提案が適切である理由の説明"
   }
-}\nImportant: Return ONLY the JSON object, without any markdown formatting or code blocks.`;
+}\n重要：JSONオブジェクトのみを返してください。マークダウン形式やコードブロックは含めないでください。`;
             const result = await this.model.generateContent([prompt, ...imageParts]);
             const response = await result.response;
             const text = this.cleanJsonResponse(response.text());
             const parsed = JSON.parse(text);
-            console.log("[LLMHelper] Parsed debug LLM response:", parsed);
+            console.log("[LLMHelper] 解析されたデバッグLLM応答:", parsed);
             return parsed;
         }
         catch (error) {
-            console.error("Error debugging solution with images:", error);
+            console.error("画像を使用したソリューションのデバッグでエラーが発生しました:", error);
             throw error;
         }
     }
@@ -106,14 +106,14 @@ class LLMHelper {
                     mimeType: "audio/mp3"
                 }
             };
-            const prompt = `${this.systemPrompt}\n\nDescribe this audio clip in a short, concise answer. In addition to your main answer, suggest several possible actions or responses the user could take next based on the audio. Do not return a structured JSON object, just answer naturally as you would to a user.`;
+            const prompt = `${this.systemPrompt}\n\nこの音声クリップを短く簡潔に説明してください。メインの回答に加えて、音声に基づいてユーザーが次に取れる可能性のある複数のアクションや回答を提案してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答してください。`;
             const result = await this.model.generateContent([prompt, audioPart]);
             const response = await result.response;
             const text = response.text();
             return { text, timestamp: Date.now() };
         }
         catch (error) {
-            console.error("Error analyzing audio file:", error);
+            console.error("音声ファイルの分析でエラーが発生しました:", error);
             throw error;
         }
     }
@@ -125,14 +125,14 @@ class LLMHelper {
                     mimeType
                 }
             };
-            const prompt = `${this.systemPrompt}\n\nDescribe this audio clip in a short, concise answer. In addition to your main answer, suggest several possible actions or responses the user could take next based on the audio. Do not return a structured JSON object, just answer naturally as you would to a user and be concise.`;
+            const prompt = `${this.systemPrompt}\n\nこの音声クリップを短く簡潔に説明してください。メインの回答に加えて、音声に基づいてユーザーが次に取れる可能性のある複数のアクションや回答を提案してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答し、簡潔にしてください。`;
             const result = await this.model.generateContent([prompt, audioPart]);
             const response = await result.response;
             const text = response.text();
             return { text, timestamp: Date.now() };
         }
         catch (error) {
-            console.error("Error analyzing audio from base64:", error);
+            console.error("base64からの音声分析でエラーが発生しました:", error);
             throw error;
         }
     }
@@ -145,14 +145,14 @@ class LLMHelper {
                     mimeType: "image/png"
                 }
             };
-            const prompt = `${this.systemPrompt}\n\nDescribe the content of this image in a short, concise answer. In addition to your main answer, suggest several possible actions or responses the user could take next based on the image. Do not return a structured JSON object, just answer naturally as you would to a user. Be concise and brief.`;
+            const prompt = `${this.systemPrompt}\n\nこの画像の内容を短く簡潔に説明してください。メインの回答に加えて、画像に基づいてユーザーが次に取れる可能性のある複数のアクションや回答を提案してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答してください。簡潔で簡潔にしてください。`;
             const result = await this.model.generateContent([prompt, imagePart]);
             const response = await result.response;
             const text = response.text();
             return { text, timestamp: Date.now() };
         }
         catch (error) {
-            console.error("Error analyzing image file:", error);
+            console.error("画像ファイルの分析でエラーが発生しました:", error);
             throw error;
         }
     }

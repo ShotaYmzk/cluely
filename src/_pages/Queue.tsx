@@ -9,6 +9,7 @@ import {
   ToastMessage
 } from "../components/ui/toast"
 import QueueCommands from "../components/Queue/QueueCommands"
+import DraggableArea from "../components/ui/DraggableArea"
 
 interface QueueProps {
   setView: React.Dispatch<React.SetStateAction<"queue" | "solutions" | "debug">>
@@ -33,8 +34,8 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
         const existing = await window.electronAPI.getScreenshots()
         return existing
       } catch (error) {
-        console.error("Error loading screenshots:", error)
-        showToast("Error", "Failed to load existing screenshots", "error")
+        console.error("スクリーンショットの読み込みエラー:", error)
+        showToast("エラー", "既存のスクリーンショットの読み込みに失敗しました", "error")
         return []
       }
     },
@@ -66,11 +67,11 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
       if (response.success) {
         refetch()
       } else {
-        console.error("Failed to delete screenshot:", response.error)
-        showToast("Error", "Failed to delete the screenshot file", "error")
+        console.error("スクリーンショットの削除に失敗:", response.error)
+        showToast("エラー", "スクリーンショットファイルの削除に失敗しました", "error")
       }
     } catch (error) {
-      console.error("Error deleting screenshot:", error)
+      console.error("スクリーンショット削除エラー:", error)
     }
   }
 
@@ -100,17 +101,17 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
       window.electronAPI.onResetView(() => refetch()),
       window.electronAPI.onSolutionError((error: string) => {
         showToast(
-          "Processing Failed",
-          "There was an error processing your screenshots.",
+          "処理失敗",
+          "スクリーンショットの処理中にエラーが発生しました。",
           "error"
         )
         setView("queue")
-        console.error("Processing error:", error)
+        console.error("処理エラー:", error)
       }),
       window.electronAPI.onProcessingNoScreenshots(() => {
         showToast(
-          "No Screenshots",
-          "There are no screenshots to process.",
+          "スクリーンショットなし",
+          "処理するスクリーンショットがありません。",
           "neutral"
         )
       })
@@ -128,31 +129,33 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
   }
 
   return (
-    <div ref={contentRef} className={`bg-transparent w-1/2`}>
-      <div className="px-4 py-3">
-        <Toast
-          open={toastOpen}
-          onOpenChange={setToastOpen}
-          variant={toastMessage.variant}
-          duration={3000}
-        >
-          <ToastTitle>{toastMessage.title}</ToastTitle>
-          <ToastDescription>{toastMessage.description}</ToastDescription>
-        </Toast>
+    <DraggableArea className="w-full h-full">
+      <div ref={contentRef} className={`bg-transparent w-1/2`}>
+        <div className="px-4 py-3">
+          <Toast
+            open={toastOpen}
+            onOpenChange={setToastOpen}
+            variant={toastMessage.variant}
+            duration={3000}
+          >
+            <ToastTitle>{toastMessage.title}</ToastTitle>
+            <ToastDescription>{toastMessage.description}</ToastDescription>
+          </Toast>
 
-        <div className="space-y-3 w-fit">
-          <ScreenshotQueue
-            isLoading={false}
-            screenshots={screenshots}
-            onDeleteScreenshot={handleDeleteScreenshot}
-          />
-          <QueueCommands
-            screenshots={screenshots}
-            onTooltipVisibilityChange={handleTooltipVisibilityChange}
-          />
+          <div className="space-y-3 w-fit">
+            <ScreenshotQueue
+              isLoading={false}
+              screenshots={screenshots}
+              onDeleteScreenshot={handleDeleteScreenshot}
+            />
+            <QueueCommands
+              screenshots={screenshots}
+              onTooltipVisibilityChange={handleTooltipVisibilityChange}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </DraggableArea>
   )
 }
 

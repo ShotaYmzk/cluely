@@ -97,5 +97,15 @@ function initializeIpcHandlers(appState) {
     electron_1.ipcMain.handle("quit-app", () => {
         electron_1.app.quit();
     });
+    // Window movement handlers
+    electron_1.ipcMain.handle("move-window-left", async () => {
+        appState.moveWindowLeft();
+    });
+    electron_1.ipcMain.handle("move-window-right", async () => {
+        appState.moveWindowRight();
+    });
+    electron_1.ipcMain.handle("move-window", async (event, deltaX, deltaY) => {
+        appState.moveWindow(deltaX, deltaY);
+    });
 }
 //# sourceMappingURL=ipcHandlers.js.map

@@ -1,0 +1,8 @@
+{
+    "ask": "質問する",
+    "clearQueue": "キューをクリア",
+    "captureWindow": "ウィンドウをキャプチャ",
+    "captureScreen": "画面全体をキャプチャ",
+    "questionPlaceholder": "スクリーンショットについて質問を入力...",
+    "solutionWindowTitle": "AIからの回答"
+  }

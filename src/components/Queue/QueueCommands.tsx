@@ -50,7 +50,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
               const result = await window.electronAPI.analyzeAudioFromBase64(base64Data, blob.type)
               setAudioResult(result.text)
             } catch (err) {
-              setAudioResult('Audio analysis failed.')
+              setAudioResult('音声分析に失敗しました。')
             }
           }
           reader.readAsDataURL(blob)
@@ -59,7 +59,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
         recorder.start()
         setIsRecording(true)
       } catch (err) {
-        setAudioResult('Could not start recording.')
+        setAudioResult('録音を開始できませんでした。')
       }
     } else {
       // Stop recording
@@ -74,7 +74,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
       <div className="text-xs text-white/90 backdrop-blur-md bg-black/60 rounded-lg py-2 px-4 flex items-center justify-center gap-4">
         {/* Show/Hide */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] leading-none">Show/Hide</span>
+          <span className="text-[11px] leading-none">表示/<br />非表示</span>
           <div className="flex gap-1">
             <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
               ⌘
@@ -88,7 +88,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
         {/* Screenshot */}
         <div className="flex items-center gap-2">
           <span className="text-[11px] leading-none truncate">
-            {screenshots.length === 0 ? "Take first screenshot" : "Screenshot"}
+            {screenshots.length === 0 ? "最初のスクリーンショットを撮影" : "スクリーンショット"}
           </span>
           <div className="flex gap-1">
             <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
@@ -103,7 +103,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
         {/* Solve Command */}
         {screenshots.length > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-[11px] leading-none">Solve</span>
+            <span className="text-[11px] leading-none">解決</span>
             <div className="flex gap-1">
               <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
                 ⌘
@@ -123,9 +123,9 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
             type="button"
           >
             {isRecording ? (
-              <span className="animate-pulse">● Stop Recording</span>
+              <span className="animate-pulse">● 録音停止</span>
             ) : (
-              <span>🎤 Record Voice</span>
+              <span>🎤録音</span>
             )}
           </button>
         </div>
@@ -148,12 +148,12 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
             >
               <div className="p-3 text-xs bg-black/80 backdrop-blur-md rounded-lg border border-white/10 text-white/90 shadow-lg">
                 <div className="space-y-4">
-                  <h3 className="font-medium truncate">Keyboard Shortcuts</h3>
+                  <h3 className="font-medium truncate">キーボードショートカット</h3>
                   <div className="space-y-3">
                     {/* Toggle Command */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="truncate">Toggle Window</span>
+                        <span className="truncate">ウィンドウ切り替え</span>
                         <div className="flex gap-1 flex-shrink-0">
                           <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
                             ⌘
@@ -164,13 +164,13 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                         </div>
                       </div>
                       <p className="text-[10px] leading-relaxed text-white/70 truncate">
-                        Show or hide this window.
+                        このウィンドウを表示または非表示にします。
                       </p>
                     </div>
                     {/* Screenshot Command */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="truncate">Take Screenshot</span>
+                        <span className="truncate">スクリーンショット撮影</span>
                         <div className="flex gap-1 flex-shrink-0">
                           <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
                             ⌘
@@ -181,16 +181,14 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                         </div>
                       </div>
                       <p className="text-[10px] leading-relaxed text-white/70 truncate">
-                        Take a screenshot of the problem description. The tool
-                        will extract and analyze the problem. The 5 latest
-                        screenshots are saved.
+                        問題の説明のスクリーンショットを撮影します。ツールは問題を抽出・分析します。最新の5つのスクリーンショットが保存されます。
                       </p>
                     </div>
 
                     {/* Solve Command */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="truncate">Solve Problem</span>
+                        <span className="truncate">問題解決</span>
                         <div className="flex gap-1 flex-shrink-0">
                           <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
                             ⌘
@@ -201,7 +199,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                         </div>
                       </div>
                       <p className="text-[10px] leading-relaxed text-white/70 truncate">
-                        Generate a solution based on the current problem.
+                        現在の問題に基づいてソリューションを生成します。
                       </p>
                     </div>
                   </div>
@@ -217,7 +215,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
         {/* Sign Out Button - Moved to end */}
         <button
           className="text-red-500/70 hover:text-red-500/90 transition-colors hover:cursor-pointer"
-          title="Sign Out"
+          title="サインアウト"
           onClick={() => window.electronAPI.quitApp()}
         >
           <IoLogOutOutline className="w-4 h-4" />
@@ -226,7 +224,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
       {/* Audio Result Display */}
       {audioResult && (
         <div className="mt-2 p-2 bg-white/10 rounded text-white text-xs max-w-md">
-          <span className="font-semibold">Audio Result:</span> {audioResult}
+          <span className="font-semibold">音声結果:</span> {audioResult}
         </div>
       )}
     </div>

@@ -127,6 +127,9 @@ class AppState {
     moveWindowUp() {
         this.windowHelper.moveWindowUp();
     }
+    moveWindow(deltaX, deltaY) {
+        this.windowHelper.moveWindow(deltaX, deltaY);
+    }
     setHasDebugged(value) {
         this.hasDebugged = value;
     }

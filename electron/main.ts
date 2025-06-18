@@ -177,6 +177,10 @@ export class AppState {
     this.windowHelper.moveWindowUp()
   }
 
+  public moveWindow(deltaX: number, deltaY: number): void {
+    this.windowHelper.moveWindow(deltaX, deltaY)
+  }
+
   public setHasDebugged(value: boolean): void {
     this.hasDebugged = value
   }

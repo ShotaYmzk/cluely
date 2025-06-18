@@ -1,5 +1,4 @@
 "use strict";
-// electron/WindowHelper.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -81,7 +80,10 @@ class WindowHelper {
             fullscreenable: false,
             hasShadow: false,
             backgroundColor: "#00000000",
-            focusable: true
+            focusable: true,
+            movable: true,
+            skipTaskbar: true,
+            type: 'panel'
         };
         this.mainWindow = new electron_1.BrowserWindow(windowSettings);
         // this.mainWindow.webContents.openDevTools()
@@ -222,6 +224,31 @@ class WindowHelper {
         this.currentY = Number(this.currentY) || 0;
         this.currentY = Math.max(-halfHeight, this.currentY - this.step);
         this.mainWindow.setPosition(Math.round(this.currentX), Math.round(this.currentY));
+    }
+    moveWindow(deltaX, deltaY) {
+        if (!this.mainWindow)
+            return;
+        // Ensure currentX and currentY are numbers
+        this.currentX = Number(this.currentX) || 0;
+        this.currentY = Number(this.currentY) || 0;
+        // Calculate new position
+        const newX = this.currentX + deltaX;
+        const newY = this.currentY + deltaY;
+        // Get screen dimensions for bounds checking
+        const primaryDisplay = electron_1.screen.getPrimaryDisplay();
+        const workArea = primaryDisplay.workAreaSize;
+        const windowWidth = this.windowSize?.width || 0;
+        const windowHeight = this.windowSize?.height || 0;
+        // Ensure window stays within screen bounds
+        const maxX = workArea.width - windowWidth;
+        const maxY = workArea.height - windowHeight;
+        const clampedX = Math.max(0, Math.min(newX, maxX));
+        const clampedY = Math.max(0, Math.min(newY, maxY));
+        // Update window position
+        this.mainWindow.setPosition(Math.round(clampedX), Math.round(clampedY));
+        // Update internal state
+        this.currentX = clampedX;
+        this.currentY = clampedY;
     }
 }
 exports.WindowHelper = WindowHelper;

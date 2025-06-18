@@ -16,6 +16,7 @@ import { ProblemStatementData } from "../types/solutions"
 import { AudioResult } from "../types/audio"
 import SolutionCommands from "../components/Solutions/SolutionCommands"
 import Debug from "./Debug"
+import DraggableArea from "../components/ui/DraggableArea"
 
 // (Using global ElectronAPI type from src/types/electron.d.ts)
 
@@ -35,7 +36,7 @@ export const ContentSection = ({
     {isLoading ? (
       <div className="mt-4 flex">
         <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-          Extracting problem statement...
+          問題文を抽出中...
         </p>
       </div>
     ) : (
@@ -62,7 +63,7 @@ const SolutionSection = ({
       <div className="space-y-1.5">
         <div className="mt-4 flex">
           <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-            Loading solutions...
+            ソリューションを読み込み中...
           </p>
         </div>
       </div>
@@ -99,24 +100,24 @@ export const ComplexitySection = ({
 }) => (
   <div className="space-y-2">
     <h2 className="text-[13px] font-medium text-white tracking-wide">
-      Complexity (Updated)
+      複雑度（更新済み）
     </h2>
     {isLoading ? (
       <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-        Calculating complexity...
+        複雑度を計算中...
       </p>
     ) : (
       <div className="space-y-1">
         <div className="flex items-start gap-2 text-[13px] leading-[1.4] text-gray-100">
           <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
           <div>
-            <strong>Time:</strong> {timeComplexity}
+            <strong>時間:</strong> {timeComplexity}
           </div>
         </div>
         <div className="flex items-start gap-2 text-[13px] leading-[1.4] text-gray-100">
           <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
           <div>
-            <strong>Space:</strong> {spaceComplexity}
+            <strong>空間:</strong> {spaceComplexity}
           </div>
         </div>
       </div>
@@ -167,7 +168,7 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
         const existing = await window.electronAPI.getScreenshots()
         return existing
       } catch (error) {
-        console.error("Error loading extra screenshots:", error)
+        console.error("追加スクリーンショットの読み込みエラー:", error)
         return []
       }
     },
@@ -197,10 +198,12 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
       if (response.success) {
         refetch() // Refetch screenshots instead of managing state directly
       } else {
-        console.error("Failed to delete extra screenshot:", response.error)
+        console.error("追加スクリーンショットの削除に失敗:", response.error)
+        showToast("エラー", "追加スクリーンショットファイルの削除に失敗しました", "error")
       }
     } catch (error) {
-      console.error("Error deleting extra screenshot:", error)
+      console.error("追加スクリーンショット削除エラー:", error)
+      showToast("エラー", "追加スクリーンショットの削除中にエラーが発生しました", "error")
     }
   }
 
@@ -368,8 +371,8 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
       }),
       window.electronAPI.onProcessingNoScreenshots(() => {
         showToast(
-          "No Screenshots",
-          "There are no extra screenshots to process.",
+          "スクリーンショットなし",
+          "処理する追加スクリーンショットがありません。",
           "neutral"
         )
       })
@@ -453,111 +456,113 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
           />
         </>
       ) : (
-        <div ref={contentRef} className="relative space-y-3 px-4 py-3">
-          <Toast
-            open={toastOpen}
-            onOpenChange={setToastOpen}
-            variant={toastMessage.variant}
-            duration={3000}
-          >
-            <ToastTitle>{toastMessage.title}</ToastTitle>
-            <ToastDescription>{toastMessage.description}</ToastDescription>
-          </Toast>
+        <DraggableArea className="w-full h-full">
+          <div ref={contentRef} className="relative space-y-3 px-4 py-3">
+            <Toast
+              open={toastOpen}
+              onOpenChange={setToastOpen}
+              variant={toastMessage.variant}
+              duration={3000}
+            >
+              <ToastTitle>{toastMessage.title}</ToastTitle>
+              <ToastDescription>{toastMessage.description}</ToastDescription>
+            </Toast>
 
-          {/* Conditionally render the screenshot queue if solutionData is available */}
-          {solutionData && (
-            <div className="bg-transparent w-fit">
-              <div className="pb-3">
-                <div className="space-y-3 w-fit">
-                  <ScreenshotQueue
-                    isLoading={debugProcessing}
-                    screenshots={extraScreenshots}
-                    onDeleteScreenshot={handleDeleteExtraScreenshot}
-                  />
+            {/* Conditionally render the screenshot queue if solutionData is available */}
+            {solutionData && (
+              <div className="bg-transparent w-fit">
+                <div className="pb-3">
+                  <div className="space-y-3 w-fit">
+                    <ScreenshotQueue
+                      isLoading={debugProcessing}
+                      screenshots={extraScreenshots}
+                      onDeleteScreenshot={handleDeleteExtraScreenshot}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navbar of commands with the SolutionsHelper */}
+            <SolutionCommands
+              extraScreenshots={extraScreenshots}
+              onTooltipVisibilityChange={handleTooltipVisibilityChange}
+            />
+
+            {/* Main Content - Modified width constraints */}
+            <div className="w-full text-sm text-black bg-black/60 rounded-md">
+              <div className="rounded-lg overflow-hidden">
+                <div className="px-4 py-3 space-y-4 max-w-full">
+                  {/* Show Screenshot or Audio Result as main output if validation_type is manual */}
+                  {problemStatementData?.validation_type === "manual" ? (
+                    <ContentSection
+                      title={problemStatementData?.output_format?.subtype === "voice" ? "音声結果" : "スクリーンショット結果"}
+                      content={problemStatementData.problem_statement}
+                      isLoading={false}
+                    />
+                  ) : (
+                    <>
+                      {/* Problem Statement Section - Only for non-manual */}
+                      <ContentSection
+                        title={problemStatementData?.output_format?.subtype === "voice" ? "音声入力" : "問題文"}
+                        content={problemStatementData?.problem_statement}
+                        isLoading={!problemStatementData}
+                      />
+                      {/* Show loading state when waiting for solution */}
+                      {problemStatementData && !solutionData && (
+                        <div className="mt-4 flex">
+                          <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+                            {problemStatementData?.output_format?.subtype === "voice" 
+                              ? "音声入力を処理中..." 
+                              : "ソリューションを生成中..."}
+                          </p>
+                        </div>
+                      )}
+                      {/* Solution Sections (legacy, only for non-manual) */}
+                      {solutionData && (
+                        <>
+                          <ContentSection
+                            title="分析"
+                            content={
+                              thoughtsData && (
+                                <div className="space-y-3">
+                                  <div className="space-y-1">
+                                    {thoughtsData.map((thought, index) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-start gap-2"
+                                      >
+                                        <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
+                                        <div>{thought}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            }
+                            isLoading={!thoughtsData}
+                          />
+                          <SolutionSection
+                            title={problemStatementData?.output_format?.subtype === "voice" ? "回答" : "ソリューション"}
+                            content={solutionData}
+                            isLoading={!solutionData}
+                          />
+                          {problemStatementData?.output_format?.subtype !== "voice" && (
+                            <ComplexitySection
+                              timeComplexity={timeComplexityData}
+                              spaceComplexity={spaceComplexityData}
+                              isLoading={!timeComplexityData || !spaceComplexityData}
+                            />
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Navbar of commands with the SolutionsHelper */}
-          <SolutionCommands
-            extraScreenshots={extraScreenshots}
-            onTooltipVisibilityChange={handleTooltipVisibilityChange}
-          />
-
-          {/* Main Content - Modified width constraints */}
-          <div className="w-full text-sm text-black bg-black/60 rounded-md">
-            <div className="rounded-lg overflow-hidden">
-              <div className="px-4 py-3 space-y-4 max-w-full">
-                {/* Show Screenshot or Audio Result as main output if validation_type is manual */}
-                {problemStatementData?.validation_type === "manual" ? (
-                  <ContentSection
-                    title={problemStatementData?.output_format?.subtype === "voice" ? "Audio Result" : "Screenshot Result"}
-                    content={problemStatementData.problem_statement}
-                    isLoading={false}
-                  />
-                ) : (
-                  <>
-                    {/* Problem Statement Section - Only for non-manual */}
-                    <ContentSection
-                      title={problemStatementData?.output_format?.subtype === "voice" ? "Voice Input" : "Problem Statement"}
-                      content={problemStatementData?.problem_statement}
-                      isLoading={!problemStatementData}
-                    />
-                    {/* Show loading state when waiting for solution */}
-                    {problemStatementData && !solutionData && (
-                      <div className="mt-4 flex">
-                        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-                          {problemStatementData?.output_format?.subtype === "voice" 
-                            ? "Processing voice input..." 
-                            : "Generating solutions..."}
-                        </p>
-                      </div>
-                    )}
-                    {/* Solution Sections (legacy, only for non-manual) */}
-                    {solutionData && (
-                      <>
-                        <ContentSection
-                          title="Analysis"
-                          content={
-                            thoughtsData && (
-                              <div className="space-y-3">
-                                <div className="space-y-1">
-                                  {thoughtsData.map((thought, index) => (
-                                    <div
-                                      key={index}
-                                      className="flex items-start gap-2"
-                                    >
-                                      <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
-                                      <div>{thought}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )
-                          }
-                          isLoading={!thoughtsData}
-                        />
-                        <SolutionSection
-                          title={problemStatementData?.output_format?.subtype === "voice" ? "Response" : "Solution"}
-                          content={solutionData}
-                          isLoading={!solutionData}
-                        />
-                        {problemStatementData?.output_format?.subtype !== "voice" && (
-                          <ComplexitySection
-                            timeComplexity={timeComplexityData}
-                            spaceComplexity={spaceComplexityData}
-                            isLoading={!timeComplexityData || !spaceComplexityData}
-                          />
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
           </div>
-        </div>
+        </DraggableArea>
       )}
     </>
   )

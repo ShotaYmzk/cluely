@@ -79,41 +79,77 @@ export class ScreenshotHelper {
     showMainWindow: () => void
   ): Promise<string> {
     hideMainWindow()
+    
+    // 少し待機してウィンドウが完全に隠れるのを待つ
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
     let screenshotPath = ""
 
-    if (this.view === "queue") {
-      screenshotPath = path.join(this.screenshotDir, `${uuidv4()}.png`)
-      await screenshot({ filename: screenshotPath })
+    try {
+      if (this.view === "queue") {
+        screenshotPath = path.join(this.screenshotDir, `${uuidv4()}.png`)
+        await screenshot({ filename: screenshotPath })
 
-      this.screenshotQueue.push(screenshotPath)
-      if (this.screenshotQueue.length > this.MAX_SCREENSHOTS) {
-        const removedPath = this.screenshotQueue.shift()
-        if (removedPath) {
-          try {
-            await fs.promises.unlink(removedPath)
-          } catch (error) {
-            console.error("Error removing old screenshot:", error)
+        this.screenshotQueue.push(screenshotPath)
+        if (this.screenshotQueue.length > this.MAX_SCREENSHOTS) {
+          const removedPath = this.screenshotQueue.shift()
+          if (removedPath) {
+            try {
+              await fs.promises.unlink(removedPath)
+            } catch (error) {
+              console.error("Error removing old screenshot:", error)
+            }
+          }
+        }
+      } else {
+        screenshotPath = path.join(this.extraScreenshotDir, `${uuidv4()}.png`)
+        await screenshot({ filename: screenshotPath })
+
+        this.extraScreenshotQueue.push(screenshotPath)
+        if (this.extraScreenshotQueue.length > this.MAX_SCREENSHOTS) {
+          const removedPath = this.extraScreenshotQueue.shift()
+          if (removedPath) {
+            try {
+              await fs.promises.unlink(removedPath)
+            } catch (error) {
+              console.error("Error removing old screenshot:", error)
+            }
           }
         }
       }
-    } else {
-      screenshotPath = path.join(this.extraScreenshotDir, `${uuidv4()}.png`)
-      await screenshot({ filename: screenshotPath })
-
-      this.extraScreenshotQueue.push(screenshotPath)
-      if (this.extraScreenshotQueue.length > this.MAX_SCREENSHOTS) {
-        const removedPath = this.extraScreenshotQueue.shift()
-        if (removedPath) {
-          try {
-            await fs.promises.unlink(removedPath)
-          } catch (error) {
-            console.error("Error removing old screenshot:", error)
-          }
-        }
+    } catch (error) {
+      console.error("スクリーンショット撮影エラー:", error)
+      
+      // フォールバック: 空の画像ファイルを作成
+      if (this.view === "queue") {
+        screenshotPath = path.join(this.screenshotDir, `${uuidv4()}.png`)
+      } else {
+        screenshotPath = path.join(this.extraScreenshotDir, `${uuidv4()}.png`)
       }
+      
+      // 1x1ピクセルの透明PNGを作成
+      const emptyImageBuffer = Buffer.from([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+        0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+        0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
+      ])
+      
+      await fs.promises.writeFile(screenshotPath, emptyImageBuffer)
+      
+      if (this.view === "queue") {
+        this.screenshotQueue.push(screenshotPath)
+      } else {
+        this.extraScreenshotQueue.push(screenshotPath)
+      }
+    } finally {
+      // 少し待機してからウィンドウを表示
+      await new Promise(resolve => setTimeout(resolve, 200))
+      showMainWindow()
     }
 
-    showMainWindow()
     return screenshotPath
   }
 
