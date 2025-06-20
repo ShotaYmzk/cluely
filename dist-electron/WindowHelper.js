@@ -8,7 +8,7 @@ const electron_1 = require("electron");
 const node_path_1 = __importDefault(require("node:path"));
 const isDev = process.env.NODE_ENV === "development";
 const startUrl = isDev
-    ? "http://localhost:5180"
+    ? "http://localhost:5173"
     : `file://${node_path_1.default.join(__dirname, "../dist/index.html")}`;
 class WindowHelper {
     mainWindow = null;

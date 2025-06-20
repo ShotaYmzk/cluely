@@ -43,6 +43,11 @@ declare global {
       analyzeAudioFromBase64: (data: string, mimeType: string) => Promise<{ text: string; timestamp: number }>
       analyzeAudioFile: (path: string) => Promise<{ text: string; timestamp: number }>
 
+      // Action Response Processing
+      onActionResponseGenerated: (callback: (data: any) => void) => () => void
+      onActionResponseError: (callback: (error: string) => void) => () => void
+      processActionResponse: (action: string) => Promise<void>
+
       moveWindowLeft: () => Promise<void>
       moveWindowRight: () => Promise<void>
       moveWindow: (deltaX: number, deltaY: number) => Promise<void>

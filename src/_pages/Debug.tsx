@@ -14,7 +14,6 @@ import {
 } from "../components/ui/toast"
 import ExtraScreenshotsQueueHelper from "../components/Solutions/SolutionCommands"
 import { diffLines } from "diff"
-import DraggableArea from "../components/ui/DraggableArea"
 
 type DiffLine = {
   value: string
@@ -342,7 +341,7 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
   }
 
   return (
-    <DraggableArea className="w-full h-full">
+    <div className="w-full h-full">
       <div ref={contentRef} className="relative space-y-3 px-4 py-3 ">
         <Toast
           open={toastOpen}
@@ -414,7 +413,7 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
           </div>
         </div>
       </div>
-    </DraggableArea>
+    </div>
   )
 }
 

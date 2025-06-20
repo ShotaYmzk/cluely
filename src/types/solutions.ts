@@ -11,6 +11,11 @@ export interface SolutionsResponse {
 
 export interface ProblemStatementData {
   problem_statement: string;
+  answer?: string;
+  explanation?: string;
+  context?: string;
+  suggested_responses?: string[];
+  reasoning?: string;
   input_format: {
     description: string;
     parameters: any[];

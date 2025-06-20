@@ -16,18 +16,22 @@ import { ProblemStatementData } from "../types/solutions"
 import { AudioResult } from "../types/audio"
 import SolutionCommands from "../components/Solutions/SolutionCommands"
 import Debug from "./Debug"
-import DraggableArea from "../components/ui/DraggableArea"
+import ExtraScreenshotsQueueHelper from "../components/Solutions/SolutionCommands"
+import { diffLines } from "diff"
+import MarkdownRenderer from "../components/ui/MarkdownRenderer"
 
 // (Using global ElectronAPI type from src/types/electron.d.ts)
 
 export const ContentSection = ({
   title,
   content,
-  isLoading
+  isLoading,
+  useMarkdown = true
 }: {
   title: string
   content: React.ReactNode
   isLoading: boolean
+  useMarkdown?: boolean
 }) => (
   <div className="space-y-2">
     <h2 className="text-[13px] font-medium text-white tracking-wide">
@@ -41,7 +45,11 @@ export const ContentSection = ({
       </div>
     ) : (
       <div className="text-[13px] leading-[1.4] text-gray-100 max-w-[600px]">
-        {content}
+        {useMarkdown && typeof content === 'string' ? (
+          <MarkdownRenderer content={content} className="text-[13px]" />
+        ) : (
+          content
+        )}
       </div>
     )}
   </div>
@@ -148,6 +156,13 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
     null
   )
   const [customContent, setCustomContent] = useState<string | null>(null)
+  const [answerData, setAnswerData] = useState<string | null>(null)
+  const [explanationData, setExplanationData] = useState<string | null>(null)
+  const [contextData, setContextData] = useState<string | null>(null)
+  const [suggestedResponsesData, setSuggestedResponsesData] = useState<string[] | null>(null)
+  const [reasoningData, setReasoningData] = useState<string | null>(null)
+  const [actionResponseData, setActionResponseData] = useState<any>(null)
+  const [isActionProcessing, setIsActionProcessing] = useState(false)
 
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<ToastMessage>({
@@ -188,22 +203,31 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
   }
 
   const handleDeleteExtraScreenshot = async (index: number) => {
-    const screenshotToDelete = extraScreenshots[index]
-
     try {
-      const response = await window.electronAPI.deleteScreenshot(
-        screenshotToDelete.path
-      )
-
-      if (response.success) {
-        refetch() // Refetch screenshots instead of managing state directly
+      const result = await window.electronAPI.deleteScreenshot(extraScreenshots[index].path)
+      if (result.success) {
+        refetch()
       } else {
-        console.error("追加スクリーンショットの削除に失敗:", response.error)
-        showToast("エラー", "追加スクリーンショットファイルの削除に失敗しました", "error")
+        console.error("Failed to delete screenshot:", result.error)
       }
     } catch (error) {
-      console.error("追加スクリーンショット削除エラー:", error)
-      showToast("エラー", "追加スクリーンショットの削除中にエラーが発生しました", "error")
+      console.error("Error deleting screenshot:", error)
+    }
+  }
+
+  const handleActionClick = async (action: string) => {
+    setIsActionProcessing(true)
+    setActionResponseData(null)
+    try {
+      await window.electronAPI.processActionResponse(action)
+    } catch (error) {
+      console.error("Error processing action:", error)
+      setIsActionProcessing(false)
+      showToast(
+        "アクション処理エラー",
+        "アクションの処理中にエラーが発生しました。",
+        "error"
+      )
     }
   }
 
@@ -257,6 +281,11 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
         setSpaceComplexityData(null)
         setCustomContent(null)
         setAudioResult(null)
+        setAnswerData(null)
+        setExplanationData(null)
+        setContextData(null)
+        setSuggestedResponsesData(null)
+        setReasoningData(null)
 
         // Start audio recording from user's microphone
         try {
@@ -375,6 +404,25 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
           "処理する追加スクリーンショットがありません。",
           "neutral"
         )
+      }),
+
+      window.electronAPI.onActionResponseGenerated((data) => {
+        setActionResponseData(data)
+        setIsActionProcessing(false)
+        showToast(
+          "アクション応答完了",
+          "選択したアクションに対する回答が生成されました。",
+          "success"
+        )
+      }),
+
+      window.electronAPI.onActionResponseError((error) => {
+        setIsActionProcessing(false)
+        showToast(
+          "アクション応答エラー",
+          `アクション応答の生成中にエラーが発生しました: ${error}`,
+          "error"
+        )
       })
     ]
 
@@ -392,9 +440,18 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
 
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event?.query.queryKey[0] === "problem_statement") {
-        setProblemStatementData(
-          queryClient.getQueryData(["problem_statement"]) || null
-        )
+        const problemData = queryClient.getQueryData(["problem_statement"]) as any
+        setProblemStatementData(problemData || null)
+        
+        // Extract answer and explanation from problem data
+        if (problemData) {
+          setAnswerData(problemData.answer || null)
+          setExplanationData(problemData.explanation || null)
+          setContextData(problemData.context || null)
+          setSuggestedResponsesData(problemData.suggested_responses || null)
+          setReasoningData(problemData.reasoning || null)
+        }
+        
         // If this is from audio processing, show it in the custom content section
         const audioResult = queryClient.getQueryData(["audio_result"]) as AudioResult | undefined;
         if (audioResult) {
@@ -422,6 +479,8 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
           setThoughtsData(null);
           setTimeComplexityData(null);
           setSpaceComplexityData(null);
+          setAnswerData(null);
+          setExplanationData(null);
         }
       }
       if (event?.query.queryKey[0] === "solution") {
@@ -430,12 +489,16 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
           thoughts: string[]
           time_complexity: string
           space_complexity: string
+          answer?: string
+          explanation?: string
         } | null
 
         setSolutionData(solution?.code ?? null)
         setThoughtsData(solution?.thoughts ?? null)
         setTimeComplexityData(solution?.time_complexity ?? null)
         setSpaceComplexityData(solution?.space_complexity ?? null)
+        setAnswerData(solution?.answer ?? null)
+        setExplanationData(solution?.explanation ?? null)
       }
     })
     return () => unsubscribe()
@@ -456,7 +519,7 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
           />
         </>
       ) : (
-        <DraggableArea className="w-full h-full">
+        <div className="w-full h-full">
           <div ref={contentRef} className="relative space-y-3 px-4 py-3">
             <Toast
               open={toastOpen}
@@ -495,11 +558,138 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
                 <div className="px-4 py-3 space-y-4 max-w-full">
                   {/* Show Screenshot or Audio Result as main output if validation_type is manual */}
                   {problemStatementData?.validation_type === "manual" ? (
-                    <ContentSection
-                      title={problemStatementData?.output_format?.subtype === "voice" ? "音声結果" : "スクリーンショット結果"}
-                      content={problemStatementData.problem_statement}
-                      isLoading={false}
-                    />
+                    <>
+                      <ContentSection
+                        title={problemStatementData?.output_format?.subtype === "voice" ? "音声分析結果" : "スクリーンショット結果"}
+                        content={problemStatementData.problem_statement}
+                        isLoading={false}
+                      />
+                      {contextData && (
+                        <ContentSection
+                          title="背景・コンテキスト"
+                          content={contextData}
+                          isLoading={false}
+                        />
+                      )}
+                      {answerData && (
+                        <ContentSection
+                          title="回答"
+                          content={answerData}
+                          isLoading={false}
+                        />
+                      )}
+                      {explanationData && (
+                        <ContentSection
+                          title="説明"
+                          content={explanationData}
+                          isLoading={false}
+                        />
+                      )}
+                      {suggestedResponsesData && suggestedResponsesData.length > 0 && (
+                        <ContentSection
+                          title="推奨アクション"
+                          content={
+                            <div className="space-y-2">
+                              {suggestedResponsesData.map((response, index) => (
+                                <div key={index} className="flex items-start gap-2">
+                                  <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
+                                  <button
+                                    onClick={() => handleActionClick(response)}
+                                    disabled={isActionProcessing}
+                                    className="text-left hover:text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {response}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          }
+                          isLoading={false}
+                          useMarkdown={false}
+                        />
+                      )}
+                      {reasoningData && (
+                        <ContentSection
+                          title="推論・理由"
+                          content={reasoningData}
+                          isLoading={false}
+                        />
+                      )}
+                      {isActionProcessing && (
+                        <ContentSection
+                          title="アクション処理中"
+                          content={
+                            <div className="flex items-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
+                              <span>アクションを処理中...</span>
+                            </div>
+                          }
+                          isLoading={false}
+                          useMarkdown={false}
+                        />
+                      )}
+                      {actionResponseData && (
+                        <ContentSection
+                          title={`アクション応答: ${actionResponseData.action_response?.action || '選択されたアクション'}`}
+                          content={
+                            <div className="space-y-4">
+                              {actionResponseData.action_response?.concrete_answer && (
+                                <div>
+                                  <h4 className="font-semibold text-sm mb-2">具体的な回答:</h4>
+                                  <div className="text-sm">{actionResponseData.action_response.concrete_answer}</div>
+                                </div>
+                              )}
+                              {actionResponseData.action_response?.detailed_explanation && (
+                                <div>
+                                  <h4 className="font-semibold text-sm mb-2">詳細な説明:</h4>
+                                  <div className="text-sm">{actionResponseData.action_response.detailed_explanation}</div>
+                                </div>
+                              )}
+                              {actionResponseData.action_response?.step_by_step && actionResponseData.action_response.step_by_step.length > 0 && (
+                                <div>
+                                  <h4 className="font-semibold text-sm mb-2">ステップバイステップ:</h4>
+                                  <div className="space-y-1">
+                                    {actionResponseData.action_response.step_by_step.map((step: string, index: number) => (
+                                      <div key={index} className="flex items-start gap-2">
+                                        <div className="w-1 h-1 rounded-full bg-green-400/80 mt-2 shrink-0" />
+                                        <div className="text-sm">{step}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {actionResponseData.action_response?.additional_context && (
+                                <div>
+                                  <h4 className="font-semibold text-sm mb-2">追加コンテキスト:</h4>
+                                  <div className="text-sm">{actionResponseData.action_response.additional_context}</div>
+                                </div>
+                              )}
+                              {actionResponseData.action_response?.next_actions && actionResponseData.action_response.next_actions.length > 0 && (
+                                <div>
+                                  <h4 className="font-semibold text-sm mb-2">次のアクション:</h4>
+                                  <div className="space-y-1">
+                                    {actionResponseData.action_response.next_actions.map((action: string, index: number) => (
+                                      <div key={index} className="flex items-start gap-2">
+                                        <div className="w-1 h-1 rounded-full bg-purple-400/80 mt-2 shrink-0" />
+                                        <button
+                                          onClick={() => handleActionClick(action)}
+                                          disabled={isActionProcessing}
+                                          className="text-left hover:text-purple-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                        >
+                                          {action}
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          }
+                          isLoading={false}
+                          useMarkdown={false}
+                        />
+                      )}
+                    </>
                   ) : (
                     <>
                       {/* Problem Statement Section - Only for non-manual */}
@@ -562,10 +752,11 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
               </div>
             </div>
           </div>
-        </DraggableArea>
+        </div>
       )}
     </>
   )
 }
 
 export default Solutions
+

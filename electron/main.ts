@@ -41,7 +41,11 @@ export class AppState {
     //states for processing the debugging
     DEBUG_START: "debug-start",
     DEBUG_SUCCESS: "debug-success",
-    DEBUG_ERROR: "debug-error"
+    DEBUG_ERROR: "debug-error",
+
+    //states for processing action responses
+    ACTION_RESPONSE_GENERATED: "action-response-generated",
+    ACTION_RESPONSE_ERROR: "action-response-error"
   } as const
 
   constructor() {

@@ -14,7 +14,10 @@ exports.PROCESSING_EVENTS = {
     //states for processing the debugging
     DEBUG_START: "debug-start",
     DEBUG_SUCCESS: "debug-success",
-    DEBUG_ERROR: "debug-error"
+    DEBUG_ERROR: "debug-error",
+    //states for processing action responses
+    ACTION_RESPONSE_GENERATED: "action-response-generated",
+    ACTION_RESPONSE_ERROR: "action-response-error"
 };
 // Expose the Electron API to the renderer process
 electron_1.contextBridge.exposeInMainWorld("electronAPI", {
@@ -106,12 +109,27 @@ electron_1.contextBridge.exposeInMainWorld("electronAPI", {
             electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.UNAUTHORIZED, subscription);
         };
     },
+    onActionResponseGenerated: (callback) => {
+        const subscription = (_, data) => callback(data);
+        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, subscription);
+        return () => {
+            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, subscription);
+        };
+    },
+    onActionResponseError: (callback) => {
+        const subscription = (_, error) => callback(error);
+        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, subscription);
+        return () => {
+            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, subscription);
+        };
+    },
     moveWindowLeft: () => electron_1.ipcRenderer.invoke("move-window-left"),
     moveWindowRight: () => electron_1.ipcRenderer.invoke("move-window-right"),
     moveWindow: (deltaX, deltaY) => electron_1.ipcRenderer.invoke("move-window", deltaX, deltaY),
     analyzeAudioFromBase64: (data, mimeType) => electron_1.ipcRenderer.invoke("analyze-audio-base64", data, mimeType),
     analyzeAudioFile: (path) => electron_1.ipcRenderer.invoke("analyze-audio-file", path),
     analyzeImageFile: (path) => electron_1.ipcRenderer.invoke("analyze-image-file", path),
+    processActionResponse: (action) => electron_1.ipcRenderer.invoke("process-action-response", action),
     quitApp: () => electron_1.ipcRenderer.invoke("quit-app")
 });
 //# sourceMappingURL=preload.js.map

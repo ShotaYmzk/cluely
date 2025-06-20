@@ -94,6 +94,17 @@ function initializeIpcHandlers(appState) {
             throw error;
         }
     });
+    // IPC handler for processing action responses
+    electron_1.ipcMain.handle("process-action-response", async (event, action) => {
+        try {
+            await appState.processingHelper.processActionResponse(action);
+            return { success: true };
+        }
+        catch (error) {
+            console.error("Error in process-action-response handler:", error);
+            throw error;
+        }
+    });
     electron_1.ipcMain.handle("quit-app", () => {
         electron_1.app.quit();
     });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react"
 import { IoLogOutOutline } from "react-icons/io5"
+import MarkdownRenderer from "../ui/MarkdownRenderer"
 
 interface QueueCommandsProps {
   onTooltipVisibilityChange: (visible: boolean, height: number) => void
@@ -223,8 +224,11 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
       </div>
       {/* Audio Result Display */}
       {audioResult && (
-        <div className="mt-2 p-2 bg-white/10 rounded text-white text-xs max-w-md">
-          <span className="font-semibold">音声結果:</span> {audioResult}
+        <div className="mt-2 p-3 bg-white/10 rounded-lg text-white max-w-md">
+          <div className="font-semibold text-xs mb-2">音声結果:</div>
+          <div className="text-xs">
+            <MarkdownRenderer content={audioResult} className="text-xs" />
+          </div>
         </div>
       )}
     </div>

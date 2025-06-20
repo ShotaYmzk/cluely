@@ -103,6 +103,17 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   })
 
+  // IPC handler for processing action responses
+  ipcMain.handle("process-action-response", async (event, action: string) => {
+    try {
+      await appState.processingHelper.processActionResponse(action)
+      return { success: true }
+    } catch (error: any) {
+      console.error("Error in process-action-response handler:", error)
+      throw error
+    }
+  })
+
   ipcMain.handle("quit-app", () => {
     app.quit()
   })

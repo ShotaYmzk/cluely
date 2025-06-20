@@ -61,9 +61,15 @@ export class ProcessingHelper {
       this.appState.setView("solutions")
       this.currentProcessingAbortController = new AbortController()
       try {
-        const imageResult = await this.llmHelper.analyzeImageFile(lastPath);
+        // Use extractProblemFromImages to get detailed analysis including answer
+        const extractedData = await this.llmHelper.extractProblemFromImages([lastPath]);
         const problemInfo = {
-          problem_statement: imageResult.text,
+          problem_statement: extractedData.problem_statement,
+          answer: extractedData.answer,
+          explanation: extractedData.explanation,
+          context: extractedData.context,
+          suggested_responses: extractedData.suggested_responses,
+          reasoning: extractedData.reasoning,
           input_format: { description: "Generated from screenshot", parameters: [] as any[] },
           output_format: { description: "Generated from screenshot", type: "string", subtype: "text" },
           complexity: { time: "N/A", space: "N/A" },
@@ -154,5 +160,24 @@ export class ProcessingHelper {
 
   public getLLMHelper() {
     return this.llmHelper;
+  }
+
+  public async processActionResponse(action: string) {
+    const mainWindow = this.appState.getMainWindow()
+    if (!mainWindow) return
+
+    const problemInfo = this.appState.getProblemInfo()
+    if (!problemInfo) {
+      console.error("No problem info available for action response")
+      return
+    }
+
+    try {
+      const actionResponse = await this.llmHelper.generateActionResponse(problemInfo, action)
+      mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, actionResponse)
+    } catch (error: any) {
+      console.error("Action response processing error:", error)
+      mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, error.message)
+    }
   }
 }

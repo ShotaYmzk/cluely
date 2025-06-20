@@ -9,7 +9,6 @@ import {
   ToastMessage
 } from "../components/ui/toast"
 import QueueCommands from "../components/Queue/QueueCommands"
-import DraggableArea from "../components/ui/DraggableArea"
 
 interface QueueProps {
   setView: React.Dispatch<React.SetStateAction<"queue" | "solutions" | "debug">>
@@ -129,7 +128,7 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
   }
 
   return (
-    <DraggableArea className="w-full h-full">
+    <div className="w-full h-full">
       <div ref={contentRef} className={`bg-transparent w-1/2`}>
         <div className="px-4 py-3">
           <Toast
@@ -155,7 +154,7 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
           </div>
         </div>
       </div>
-    </DraggableArea>
+    </div>
   )
 }
 

@@ -33,6 +33,9 @@ interface ElectronAPI {
   analyzeAudioFile: (path: string) => Promise<{ text: string; timestamp: number }>
   analyzeImageFile: (path: string) => Promise<void>
   quitApp: () => Promise<void>
+  onActionResponseGenerated: (callback: (data: any) => void) => () => void
+  onActionResponseError: (callback: (error: string) => void) => () => void
+  processActionResponse: (action: string) => Promise<void>
 }
 
 export const PROCESSING_EVENTS = {
@@ -49,7 +52,11 @@ export const PROCESSING_EVENTS = {
   //states for processing the debugging
   DEBUG_START: "debug-start",
   DEBUG_SUCCESS: "debug-success",
-  DEBUG_ERROR: "debug-error"
+  DEBUG_ERROR: "debug-error",
+
+  //states for processing action responses
+  ACTION_RESPONSE_GENERATED: "action-response-generated",
+  ACTION_RESPONSE_ERROR: "action-response-error"
 } as const
 
 // Expose the Electron API to the renderer process
@@ -161,11 +168,26 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener(PROCESSING_EVENTS.UNAUTHORIZED, subscription)
     }
   },
+  onActionResponseGenerated: (callback: (data: any) => void) => {
+    const subscription = (_: any, data: any) => callback(data)
+    ipcRenderer.on(PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, subscription)
+    return () => {
+      ipcRenderer.removeListener(PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, subscription)
+    }
+  },
+  onActionResponseError: (callback: (error: string) => void) => {
+    const subscription = (_: any, error: string) => callback(error)
+    ipcRenderer.on(PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, subscription)
+    return () => {
+      ipcRenderer.removeListener(PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, subscription)
+    }
+  },
   moveWindowLeft: () => ipcRenderer.invoke("move-window-left"),
   moveWindowRight: () => ipcRenderer.invoke("move-window-right"),
   moveWindow: (deltaX: number, deltaY: number) => ipcRenderer.invoke("move-window", deltaX, deltaY),
   analyzeAudioFromBase64: (data: string, mimeType: string) => ipcRenderer.invoke("analyze-audio-base64", data, mimeType),
   analyzeAudioFile: (path: string) => ipcRenderer.invoke("analyze-audio-file", path),
   analyzeImageFile: (path: string) => ipcRenderer.invoke("analyze-image-file", path),
+  processActionResponse: (action: string) => ipcRenderer.invoke("process-action-response", action),
   quitApp: () => ipcRenderer.invoke("quit-app")
 } as ElectronAPI)
