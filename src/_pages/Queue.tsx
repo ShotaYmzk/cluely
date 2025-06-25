@@ -1,3 +1,7 @@
+// src/_pages/Queue.tsx
+
+/// <reference path="../types/electron.d.ts" />
+
 import React, { useState, useEffect, useRef } from "react"
 import { useQuery } from "react-query"
 import ScreenshotQueue from "../components/Queue/ScreenshotQueue"
@@ -29,20 +33,25 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
   const { data: screenshots = [], refetch } = useQuery<Array<{ path: string; preview: string }>, Error>(
     ["screenshots"],
     async () => {
-      try {
-        const existing = await window.electronAPI.getScreenshots()
-        return existing
-      } catch (error) {
-        console.error("スクリーンショットの読み込みエラー:", error)
-        showToast("エラー", "既存のスクリーンショットの読み込みに失敗しました", "error")
-        return []
+      // electronAPIが存在するかチェックしてから呼び出す
+      if (window.electronAPI) {
+        try {
+          const existing = await window.electronAPI.getScreenshots()
+          return existing
+        } catch (error) {
+          console.error("スクリーンショットの読み込みエラー:", error)
+          showToast("エラー", "既存のスクリーンショットの読み込みに失敗しました", "error")
+          return []
+        }
       }
+      return [] // electronAPIがない場合は空を返す
     },
     {
       staleTime: Infinity,
       cacheTime: Infinity,
       refetchOnWindowFocus: true,
-      refetchOnMount: true
+      refetchOnMount: true,
+      enabled: !!window.electronAPI // electronAPIが利用可能になってからクエリを実行
     }
   )
 
@@ -59,14 +68,15 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
     const screenshotToDelete = screenshots[index]
 
     try {
-      const response = await window.electronAPI.deleteScreenshot(
+      // オプショナルチェイニングで安全に呼び出す
+      const response = await window.electronAPI?.deleteScreenshot(
         screenshotToDelete.path
       )
 
-      if (response.success) {
+      if (response?.success) {
         refetch()
       } else {
-        console.error("スクリーンショットの削除に失敗:", response.error)
+        console.error("スクリーンショットの削除に失敗:", response?.error)
         showToast("エラー", "スクリーンショットファイルの削除に失敗しました", "error")
       }
     } catch (error) {
@@ -75,6 +85,9 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
   }
 
   useEffect(() => {
+    // APIが利用できない場合は何もしない
+    if (!window.electronAPI) return;
+
     const updateDimensions = () => {
       if (contentRef.current) {
         let contentHeight = contentRef.current.scrollHeight
@@ -82,7 +95,8 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
         if (isTooltipVisible) {
           contentHeight += tooltipHeight
         }
-        window.electronAPI.updateContentDimensions({
+        // オプショナルチェイニングで安全に呼び出す
+        window.electronAPI?.updateContentDimensions({
           width: contentWidth,
           height: contentHeight
         })
@@ -114,13 +128,13 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
           "neutral"
         )
       })
-    ]
+    ].filter(Boolean) // 存在しない可能性のある関数をフィルタリング
 
     return () => {
       resizeObserver.disconnect()
-      cleanupFunctions.forEach((cleanup) => cleanup())
+      cleanupFunctions.forEach((cleanup) => cleanup && cleanup())
     }
-  }, [isTooltipVisible, tooltipHeight])
+  }, [isTooltipVisible, tooltipHeight, refetch, setView])
 
   const handleTooltipVisibilityChange = (visible: boolean, height: number) => {
     setIsTooltipVisible(visible)

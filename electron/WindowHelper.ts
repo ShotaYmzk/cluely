@@ -1,12 +1,11 @@
+// electron/WindowHelper.ts
+
 import { BrowserWindow, screen } from "electron"
-import { AppState } from "main"
+import { AppState } from "./main"
 import path from "node:path"
 
-const isDev = process.env.NODE_ENV === "development"
-
-const startUrl = isDev
-  ? "http://localhost:5173"
-  : `file://${path.join(__dirname, "../dist/index.html")}`
+// vite-plugin-electron によって注入される環境変数
+const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
 export class WindowHelper {
   private mainWindow: BrowserWindow | null = null
@@ -15,7 +14,6 @@ export class WindowHelper {
   private windowSize: { width: number; height: number } | null = null
   private appState: AppState
 
-  // Initialize with explicit number type and 0 value
   private screenWidth: number = 0
   private screenHeight: number = 0
   private step: number = 0
@@ -29,27 +27,17 @@ export class WindowHelper {
   public setWindowDimensions(width: number, height: number): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return
 
-    // Get current window position
     const [currentX, currentY] = this.mainWindow.getPosition()
-
-    // Get screen dimensions
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workAreaSize
-
-    // Use 75% width if debugging has occurred, otherwise use 60%
     const maxAllowedWidth = Math.floor(
       workArea.width * (this.appState.getHasDebugged() ? 0.75 : 0.5)
     )
-
-    // Ensure width doesn't exceed max allowed width and height is reasonable
     const newWidth = Math.min(width + 32, maxAllowedWidth)
     const newHeight = Math.ceil(height)
-
-    // Center the window horizontally if it would go off screen
     const maxX = workArea.width - newWidth
     const newX = Math.min(Math.max(currentX, 0), maxX)
 
-    // Update window bounds
     this.mainWindow.setBounds({
       x: newX,
       y: currentY,
@@ -57,7 +45,6 @@ export class WindowHelper {
       height: newHeight
     })
 
-    // Update internal state
     this.windowPosition = { x: newX, y: currentY }
     this.windowSize = { width: newWidth, height: newHeight }
     this.currentX = newX
@@ -70,9 +57,8 @@ export class WindowHelper {
     const workArea = primaryDisplay.workAreaSize
     this.screenWidth = workArea.width
     this.screenHeight = workArea.height
-
-    this.step = Math.floor(this.screenWidth / 10) // 10 steps
-    this.currentX = 0 // Start at the left
+    this.step = Math.floor(this.screenWidth / 10)
+    this.currentX = 0
 
     const windowSettings: Electron.BrowserWindowConstructorOptions = {
       height: 600,
@@ -81,9 +67,10 @@ export class WindowHelper {
       x: this.currentX,
       y: 0,
       webPreferences: {
-        nodeIntegration: true,
+        // vite-plugin-electron がビルドした preload スクリプトを読み込む
+        preload: path.join(__dirname, 'preload.js'),
+        nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, "preload.js")
       },
       show: true,
       alwaysOnTop: true,
@@ -103,25 +90,25 @@ export class WindowHelper {
     this.mainWindow.setContentProtection(true)
 
     if (process.platform === "darwin") {
-      this.mainWindow.setVisibleOnAllWorkspaces(true, {
-        visibleOnFullScreen: true
-      })
+      this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
       this.mainWindow.setHiddenInMissionControl(true)
       this.mainWindow.setAlwaysOnTop(true, "floating")
     }
     if (process.platform === "linux") {
-      // Linux-specific optimizations for stealth overlays
       if (this.mainWindow.setHasShadow) {
         this.mainWindow.setHasShadow(false)
       }
       this.mainWindow.setFocusable(false)
-    } 
+    }
     this.mainWindow.setSkipTaskbar(true)
     this.mainWindow.setAlwaysOnTop(true)
 
-    this.mainWindow.loadURL(startUrl).catch((err) => {
-      console.error("Failed to load URL:", err)
-    })
+    // 開発サーバーのURLが存在すればそれを読み込み、なければ本番用のファイルを読み込む
+    if (VITE_DEV_SERVER_URL) {
+      this.mainWindow.loadURL(VITE_DEV_SERVER_URL)
+    } else {
+      this.mainWindow.loadFile(path.join(process.env.DIST, 'index.html'))
+    }
 
     const bounds = this.mainWindow.getBounds()
     this.windowPosition = { x: bounds.x, y: bounds.y }
@@ -173,7 +160,6 @@ export class WindowHelper {
       console.warn("Main window does not exist or is destroyed.")
       return
     }
-
     const bounds = this.mainWindow.getBounds()
     this.windowPosition = { x: bounds.x, y: bounds.y }
     this.windowSize = { width: bounds.width, height: bounds.height }
@@ -186,7 +172,6 @@ export class WindowHelper {
       console.warn("Main window does not exist or is destroyed.")
       return
     }
-
     if (this.windowPosition && this.windowSize) {
       this.mainWindow.setBounds({
         x: this.windowPosition.x,
@@ -195,9 +180,7 @@ export class WindowHelper {
         height: this.windowSize.height
       })
     }
-
     this.mainWindow.showInactive()
-
     this.isWindowVisible = true
   }
 
@@ -209,112 +192,61 @@ export class WindowHelper {
     }
   }
 
-  // New methods for window movement
   public moveWindowRight(): void {
     if (!this.mainWindow) return
-
     const windowWidth = this.windowSize?.width || 0
     const halfWidth = windowWidth / 2
-
-    // Ensure currentX and currentY are numbers
     this.currentX = Number(this.currentX) || 0
     this.currentY = Number(this.currentY) || 0
-
-    this.currentX = Math.min(
-      this.screenWidth - halfWidth,
-      this.currentX + this.step
-    )
-    this.mainWindow.setPosition(
-      Math.round(this.currentX),
-      Math.round(this.currentY)
-    )
+    this.currentX = Math.min(this.screenWidth - halfWidth, this.currentX + this.step)
+    this.mainWindow.setPosition(Math.round(this.currentX), Math.round(this.currentY))
   }
 
   public moveWindowLeft(): void {
     if (!this.mainWindow) return
-
     const windowWidth = this.windowSize?.width || 0
     const halfWidth = windowWidth / 2
-
-    // Ensure currentX and currentY are numbers
     this.currentX = Number(this.currentX) || 0
     this.currentY = Number(this.currentY) || 0
-
     this.currentX = Math.max(-halfWidth, this.currentX - this.step)
-    this.mainWindow.setPosition(
-      Math.round(this.currentX),
-      Math.round(this.currentY)
-    )
+    this.mainWindow.setPosition(Math.round(this.currentX), Math.round(this.currentY))
   }
 
   public moveWindowDown(): void {
     if (!this.mainWindow) return
-
     const windowHeight = this.windowSize?.height || 0
     const halfHeight = windowHeight / 2
-
-    // Ensure currentX and currentY are numbers
     this.currentX = Number(this.currentX) || 0
     this.currentY = Number(this.currentY) || 0
-
-    this.currentY = Math.min(
-      this.screenHeight - halfHeight,
-      this.currentY + this.step
-    )
-    this.mainWindow.setPosition(
-      Math.round(this.currentX),
-      Math.round(this.currentY)
-    )
+    this.currentY = Math.min(this.screenHeight - halfHeight, this.currentY + this.step)
+    this.mainWindow.setPosition(Math.round(this.currentX), Math.round(this.currentY))
   }
 
   public moveWindowUp(): void {
     if (!this.mainWindow) return
-
     const windowHeight = this.windowSize?.height || 0
     const halfHeight = windowHeight / 2
-
-    // Ensure currentX and currentY are numbers
     this.currentX = Number(this.currentX) || 0
     this.currentY = Number(this.currentY) || 0
-
     this.currentY = Math.max(-halfHeight, this.currentY - this.step)
-    this.mainWindow.setPosition(
-      Math.round(this.currentX),
-      Math.round(this.currentY)
-    )
+    this.mainWindow.setPosition(Math.round(this.currentX), Math.round(this.currentY))
   }
 
   public moveWindow(deltaX: number, deltaY: number): void {
     if (!this.mainWindow) return
-
-    // Ensure currentX and currentY are numbers
     this.currentX = Number(this.currentX) || 0
     this.currentY = Number(this.currentY) || 0
-
-    // Calculate new position
     const newX = this.currentX + deltaX
     const newY = this.currentY + deltaY
-
-    // Get screen dimensions for bounds checking
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workAreaSize
     const windowWidth = this.windowSize?.width || 0
     const windowHeight = this.windowSize?.height || 0
-
-    // Ensure window stays within screen bounds
     const maxX = workArea.width - windowWidth
     const maxY = workArea.height - windowHeight
-
     const clampedX = Math.max(0, Math.min(newX, maxX))
     const clampedY = Math.max(0, Math.min(newY, maxY))
-
-    // Update window position
-    this.mainWindow.setPosition(
-      Math.round(clampedX),
-      Math.round(clampedY)
-    )
-
-    // Update internal state
+    this.mainWindow.setPosition(Math.round(clampedX), Math.round(clampedY))
     this.currentX = clampedX
     this.currentY = clampedY
   }
