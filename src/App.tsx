@@ -4,10 +4,11 @@
 
 import { ToastProvider } from "./components/ui/toast"
 import Queue from "./_pages/Queue"
-import { ToastViewport } from "@radix-ui/react-toast"
+import { ToastViewport } from "./components/ui/toast" // 直接インポート
 import { useEffect, useRef, useState } from "react"
 import Solutions from "./_pages/Solutions"
 import { QueryClient, QueryClientProvider } from "react-query"
+import Debug from "./_pages/Debug" // Debugコンポーネントをインポート
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +21,7 @@ const queryClient = new QueryClient({
 
 const App: React.FC = () => {
   const [view, setView] = useState<"queue" | "solutions" | "debug">("queue")
+  const [isProcessing, setIsProcessing] = useState(false) // isProcessingをAppレベルで管理
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -27,6 +29,7 @@ const App: React.FC = () => {
       if (!containerRef.current) return
       const height = containerRef.current.scrollHeight
       const width = containerRef.current.scrollWidth
+      // APIが存在することを確認してから呼び出す
       window.electronAPI?.updateContentDimensions({ width, height })
     }
 
@@ -52,6 +55,7 @@ const App: React.FC = () => {
   }, [view])
 
   useEffect(() => {
+    // electronAPIが利用可能になってからリスナーを登録
     if (window.electronAPI) {
       const cleanups = [
         window.electronAPI.onResetView(() => {
@@ -63,12 +67,16 @@ const App: React.FC = () => {
           setView("solutions")
           console.log("starting processing")
         }),
-        // ERROR FIX: Call onUnauthorized correctly
         window.electronAPI.onUnauthorized(() => {
           queryClient.removeQueries()
           setView("queue")
           console.log("Unauthorized")
         }),
+        // Debugビューへの切り替えリスナーを追加
+        window.electronAPI.onDebugStart(() => {
+          setView("debug")
+          setIsProcessing(true)
+        })
       ].filter(Boolean) as (() => void)[];
 
       return () => {
@@ -82,13 +90,9 @@ const App: React.FC = () => {
     <div ref={containerRef} className="min-h-0">
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          {view === "queue" ? (
-            <Queue setView={setView} />
-          ) : view === "solutions" ? (
-            <Solutions setView={setView} />
-          ) : (
-            <></>
-          )}
+          {view === "queue" && <Queue setView={setView} />}
+          {view === "solutions" && <Solutions setView={setView} />}
+          {view === "debug" && <Debug isProcessing={isProcessing} setIsProcessing={setIsProcessing} />}
           <ToastViewport />
         </ToastProvider>
       </QueryClientProvider>
