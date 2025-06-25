@@ -1,4 +1,5 @@
 "use strict";
+// electron/WindowHelper.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -6,17 +7,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WindowHelper = void 0;
 const electron_1 = require("electron");
 const node_path_1 = __importDefault(require("node:path"));
-const isDev = process.env.NODE_ENV === "development";
-const startUrl = isDev
-    ? "http://localhost:5173"
-    : `file://${node_path_1.default.join(__dirname, "../dist/index.html")}`;
+// vite-plugin-electron によって注入される環境変数
+const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 class WindowHelper {
     mainWindow = null;
     isWindowVisible = false;
     windowPosition = null;
     windowSize = null;
     appState;
-    // Initialize with explicit number type and 0 value
     screenWidth = 0;
     screenHeight = 0;
     step = 0;
@@ -28,27 +26,20 @@ class WindowHelper {
     setWindowDimensions(width, height) {
         if (!this.mainWindow || this.mainWindow.isDestroyed())
             return;
-        // Get current window position
         const [currentX, currentY] = this.mainWindow.getPosition();
-        // Get screen dimensions
         const primaryDisplay = electron_1.screen.getPrimaryDisplay();
         const workArea = primaryDisplay.workAreaSize;
-        // Use 75% width if debugging has occurred, otherwise use 60%
         const maxAllowedWidth = Math.floor(workArea.width * (this.appState.getHasDebugged() ? 0.75 : 0.5));
-        // Ensure width doesn't exceed max allowed width and height is reasonable
         const newWidth = Math.min(width + 32, maxAllowedWidth);
         const newHeight = Math.ceil(height);
-        // Center the window horizontally if it would go off screen
         const maxX = workArea.width - newWidth;
         const newX = Math.min(Math.max(currentX, 0), maxX);
-        // Update window bounds
         this.mainWindow.setBounds({
             x: newX,
             y: currentY,
             width: newWidth,
             height: newHeight
         });
-        // Update internal state
         this.windowPosition = { x: newX, y: currentY };
         this.windowSize = { width: newWidth, height: newHeight };
         this.currentX = newX;
@@ -60,8 +51,8 @@ class WindowHelper {
         const workArea = primaryDisplay.workAreaSize;
         this.screenWidth = workArea.width;
         this.screenHeight = workArea.height;
-        this.step = Math.floor(this.screenWidth / 10); // 10 steps
-        this.currentX = 0; // Start at the left
+        this.step = Math.floor(this.screenWidth / 10);
+        this.currentX = 0;
         const windowSettings = {
             height: 600,
             minWidth: undefined,
@@ -69,9 +60,10 @@ class WindowHelper {
             x: this.currentX,
             y: 0,
             webPreferences: {
-                nodeIntegration: true,
+                // vite-plugin-electron がビルドした preload スクリプトを読み込む
+                preload: node_path_1.default.join(__dirname, 'preload.js'),
+                nodeIntegration: false,
                 contextIsolation: true,
-                preload: node_path_1.default.join(__dirname, "preload.js")
             },
             show: true,
             alwaysOnTop: true,
@@ -89,14 +81,11 @@ class WindowHelper {
         // this.mainWindow.webContents.openDevTools()
         this.mainWindow.setContentProtection(true);
         if (process.platform === "darwin") {
-            this.mainWindow.setVisibleOnAllWorkspaces(true, {
-                visibleOnFullScreen: true
-            });
+            this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
             this.mainWindow.setHiddenInMissionControl(true);
             this.mainWindow.setAlwaysOnTop(true, "floating");
         }
         if (process.platform === "linux") {
-            // Linux-specific optimizations for stealth overlays
             if (this.mainWindow.setHasShadow) {
                 this.mainWindow.setHasShadow(false);
             }
@@ -104,9 +93,13 @@ class WindowHelper {
         }
         this.mainWindow.setSkipTaskbar(true);
         this.mainWindow.setAlwaysOnTop(true);
-        this.mainWindow.loadURL(startUrl).catch((err) => {
-            console.error("Failed to load URL:", err);
-        });
+        // 開発サーバーのURLが存在すればそれを読み込み、なければ本番用のファイルを読み込む
+        if (VITE_DEV_SERVER_URL) {
+            this.mainWindow.loadURL(VITE_DEV_SERVER_URL);
+        }
+        else {
+            this.mainWindow.loadFile(node_path_1.default.join(process.env.DIST, 'index.html'));
+        }
         const bounds = this.mainWindow.getBounds();
         this.windowPosition = { x: bounds.x, y: bounds.y };
         this.windowSize = { width: bounds.width, height: bounds.height };
@@ -180,13 +173,11 @@ class WindowHelper {
             this.showMainWindow();
         }
     }
-    // New methods for window movement
     moveWindowRight() {
         if (!this.mainWindow)
             return;
         const windowWidth = this.windowSize?.width || 0;
         const halfWidth = windowWidth / 2;
-        // Ensure currentX and currentY are numbers
         this.currentX = Number(this.currentX) || 0;
         this.currentY = Number(this.currentY) || 0;
         this.currentX = Math.min(this.screenWidth - halfWidth, this.currentX + this.step);
@@ -197,7 +188,6 @@ class WindowHelper {
             return;
         const windowWidth = this.windowSize?.width || 0;
         const halfWidth = windowWidth / 2;
-        // Ensure currentX and currentY are numbers
         this.currentX = Number(this.currentX) || 0;
         this.currentY = Number(this.currentY) || 0;
         this.currentX = Math.max(-halfWidth, this.currentX - this.step);
@@ -208,7 +198,6 @@ class WindowHelper {
             return;
         const windowHeight = this.windowSize?.height || 0;
         const halfHeight = windowHeight / 2;
-        // Ensure currentX and currentY are numbers
         this.currentX = Number(this.currentX) || 0;
         this.currentY = Number(this.currentY) || 0;
         this.currentY = Math.min(this.screenHeight - halfHeight, this.currentY + this.step);
@@ -219,7 +208,6 @@ class WindowHelper {
             return;
         const windowHeight = this.windowSize?.height || 0;
         const halfHeight = windowHeight / 2;
-        // Ensure currentX and currentY are numbers
         this.currentX = Number(this.currentX) || 0;
         this.currentY = Number(this.currentY) || 0;
         this.currentY = Math.max(-halfHeight, this.currentY - this.step);
@@ -228,25 +216,19 @@ class WindowHelper {
     moveWindow(deltaX, deltaY) {
         if (!this.mainWindow)
             return;
-        // Ensure currentX and currentY are numbers
         this.currentX = Number(this.currentX) || 0;
         this.currentY = Number(this.currentY) || 0;
-        // Calculate new position
         const newX = this.currentX + deltaX;
         const newY = this.currentY + deltaY;
-        // Get screen dimensions for bounds checking
         const primaryDisplay = electron_1.screen.getPrimaryDisplay();
         const workArea = primaryDisplay.workAreaSize;
         const windowWidth = this.windowSize?.width || 0;
         const windowHeight = this.windowSize?.height || 0;
-        // Ensure window stays within screen bounds
         const maxX = workArea.width - windowWidth;
         const maxY = workArea.height - windowHeight;
         const clampedX = Math.max(0, Math.min(newX, maxX));
         const clampedY = Math.max(0, Math.min(newY, maxY));
-        // Update window position
         this.mainWindow.setPosition(Math.round(clampedX), Math.round(clampedY));
-        // Update internal state
         this.currentX = clampedX;
         this.currentY = clampedY;
     }

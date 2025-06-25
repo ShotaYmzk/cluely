@@ -130,4 +130,126 @@ export function initializeIpcHandlers(appState: AppState): void {
   ipcMain.handle("move-window", async (event, deltaX: number, deltaY: number) => {
     appState.moveWindow(deltaX, deltaY)
   })
+
+  // 🎤 音声+スクリーンショット統合処理
+  ipcMain.handle("process-voice-and-screenshot", async (event, { voiceText, screenshotPath }) => {
+    try {
+      console.log("🎤 音声+画面解析処理開始:", { voiceText, screenshotPath })
+      
+      // スクリーンショットパスを確認
+      if (!screenshotPath || !screenshotPath.path) {
+        throw new Error("スクリーンショットパスが無効です")
+      }
+
+      const imagePath = screenshotPath.path || screenshotPath
+
+      // LLMHelperを使用して画像から問題を抽出
+      const problemInfo = await appState.processingHelper.getLLMHelper().extractProblemFromImages([imagePath])
+      
+      // 音声入力をプロンプトに追加
+      const enhancedProblemInfo = {
+        ...problemInfo,
+        voice_input: voiceText,
+        problem_statement: `${problemInfo.problem_statement}\n\n音声での質問: "${voiceText}"`,
+        context: `${problemInfo.context}\n\nユーザーが音声で「${voiceText}」と質問しています。画面の内容と音声の質問を総合的に考慮して回答してください。`
+      }
+      
+      // AI回答生成
+      const solution = await appState.processingHelper.getLLMHelper().generateSolution(enhancedProblemInfo)
+      
+      console.log("🤖 音声+画面解析処理完了")
+      return {
+        success: true,
+        solution,
+        problemInfo: enhancedProblemInfo,
+        voiceText,
+        screenshotPath: imagePath
+      }
+    } catch (error: any) {
+      console.error("音声+画面解析処理でエラー:", error)
+      return {
+        success: false,
+        error: error.message,
+        solution: {
+          answer: `処理中にエラーが発生しました: ${error.message}`
+        }
+      }
+    }
+  })
+
+  // 🎤 音声のみ処理
+  ipcMain.handle("process-voice-only", async (event, { voiceText }) => {
+    try {
+      console.log("🎤 音声のみ処理開始:", voiceText)
+      
+      // 音声入力のみの場合の処理（型を明示的に指定）
+      const problemInfo: {
+        problem_statement: string
+        context: string
+        voice_input: string
+        answer: string
+        explanation: string
+        suggested_responses: string[]
+        reasoning: string
+      } = {
+        problem_statement: `ユーザーからの音声質問: "${voiceText}"`,
+        context: "音声のみでの質問です。画面情報は利用できません。",
+        voice_input: voiceText,
+        answer: "",
+        explanation: "",
+        suggested_responses: [],
+        reasoning: ""
+      }
+      
+      // AI回答生成
+      const solution = await appState.processingHelper.getLLMHelper().generateSolution(problemInfo)
+      
+      console.log("🤖 音声のみ処理完了")
+      return {
+        success: true,
+        solution,
+        problemInfo,
+        voiceText
+      }
+    } catch (error: any) {
+      console.error("音声のみ処理でエラー:", error)
+      return {
+        success: false,
+        error: error.message,
+        solution: {
+          answer: `音声処理中にエラーが発生しました: ${error.message}。スクリーンショット機能と組み合わせてより詳細な分析を行ってください。`
+        }
+      }
+    }
+  })
+
+  // 🎤 音声認識テスト用（デバッグ）
+  ipcMain.handle("test-voice-recognition", async (event, { testText }) => {
+    try {
+      console.log("🎤 音声認識テスト:", testText)
+      
+      return {
+        success: true,
+        received: testText,
+        timestamp: new Date().toISOString(),
+        message: "音声認識テストが正常に動作しています！"
+      }
+    } catch (error: any) {
+      console.error("音声認識テストエラー:", error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  })
+
+  console.log("🎤 音声処理IPCハンドラーが登録されました") // デバッグ用ログ
 }
+
+// electron/ipcHandlers.ts の最後に追加
+
+  // 🔧 接続テスト用pingハンドラー
+  ipcMain.handle("ping", async () => {
+    console.log("🔧 Ping受信 - ElectronAPI正常動作")
+    return "pong - ElectronAPI接続OK!"
+  })

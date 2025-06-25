@@ -1,6 +1,5 @@
 // src/types/electron.d.ts
 
-// ElectronAPIの型定義がグローバルスコープで利用できるようにする
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
@@ -34,4 +33,8 @@ export interface ElectronAPI {
   onLlmChunk: (callback: (chunk: string) => void) => () => void;
   onLlmStreamEnd: (callback: () => void) => () => void;
   onLlmError: (callback: (error: string) => void) => () => void;
+
+  // --- ERROR FIX: Add back missing definitions for compatibility ---
+  onSolutionError: (callback: (error: string) => void) => () => void;
+  onUnauthorized: (callback: () => void) => () => void;
 }

@@ -27,7 +27,7 @@ class LLMHelper {
         const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
         // 古いライブラリバージョンとの互換性のため、systemInstructionは使用しない
         this.model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash-latest",
+            model: "gemini-2.5-flash-lite-preview-06-17",
         });
     }
     createContentWithSystemPrompt(userParts) {
@@ -93,10 +93,8 @@ class LLMHelper {
         return { text: result.text, timestamp: Date.now() };
     }
     async analyzeAudioFromBase64(data, mimeType) {
-        const audioPart = { inlineData: { data, mimeType } };
-        const promptPart = { text: "この音声クリップを短く簡潔に説明してください。" };
-        const result = await this.generateNonStreamResponse([promptPart, audioPart]);
-        return { text: result.text, timestamp: Date.now() };
+        // TODO: Implement actual logic
+        return "analyzeAudioFromBase64: Not implemented";
     }
     async analyzeImageFile(imagePath) {
         const imagePart = await this.fileToGenerativePart(imagePath, "image/png");
@@ -108,6 +106,22 @@ class LLMHelper {
         const promptText = `ユーザーは以下の状況で「${action}」というアクションを選択しました。\n状況: ${JSON.stringify(problemInfo)}\n\nこのアクションに対する具体的で役立つ応答を生成してください。`;
         const result = await this.generateNonStreamResponse([{ text: promptText }]);
         return { action_response: { concrete_answer: result.text } };
+    }
+    async extractProblemFromImages(imagePaths) {
+        // TODO: Implement actual logic
+        return {
+            problem_statement: "ダミー問題文",
+            context: "ダミーコンテキスト"
+        };
+    }
+    async generateSolution(problemInfo) {
+        // TODO: Implement actual logic
+        return {
+            answer: "ダミー回答",
+            explanation: "ダミー解説",
+            suggested_responses: [],
+            reasoning: "ダミー推論"
+        };
     }
 }
 exports.LLMHelper = LLMHelper;

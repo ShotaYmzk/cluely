@@ -7,8 +7,55 @@ export const PROCESSING_EVENTS = {
   NO_SCREENSHOTS: "processing-no-screenshots",
   INITIAL_START: "initial-start",
   ACTION_RESPONSE_GENERATED: "action-response-generated",
-  ACTION_RESPONSE_ERROR: "action-response-error"
+  ACTION_RESPONSE_ERROR: "action-response-error",
+  // 以前の定義から追加
+  INITIAL_SOLUTION_ERROR: "solution-error",
 } as const
+
+// 型定義: ElectronAPI
+// export type ElectronAPI = { ... } を削除し、interfaceのみ残す
+
+// より詳細なインターフェース定義
+export interface ElectronAPI {
+  // ... 既存のメソッド
+
+  // 🎤 音声処理メソッド（新規追加）
+  processVoiceAndScreenshot: (voiceText: string, screenshotPath: string) => Promise<{
+    success: boolean
+    solution?: {
+      answer: string
+      explanation: string
+      code?: string
+      suggested_responses?: string[]
+    }
+    problemInfo?: any
+    voiceText?: string
+    screenshotPath?: string
+    error?: string
+  }>
+
+  processVoiceOnly: (voiceText: string) => Promise<{
+    success: boolean
+    solution?: {
+      answer: string
+      explanation: string
+      suggested_responses?: string[]
+    }
+    problemInfo?: any
+    voiceText?: string
+    error?: string
+  }>
+
+  testVoiceRecognition: (testText: string) => Promise<{
+    success: boolean
+    received?: string
+    timestamp?: string
+    message?: string
+    error?: string
+  }>
+
+  ping: () => Promise<string>
+}
 
 contextBridge.exposeInMainWorld("electronAPI", {
   // General
@@ -65,4 +112,75 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on('llm-error', subscription)
     return () => ipcRenderer.removeListener('llm-error', subscription)
   },
-});
+
+  // --- ERROR FIX: Add back missing listeners for compatibility ---
+  onSolutionError: (callback: (error: string) => void) => {
+    const sub = (_: IpcRendererEvent, error: string) => callback(error);
+    ipcRenderer.on(PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR, sub);
+    return () => ipcRenderer.removeListener(PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR, sub);
+  },
+  onUnauthorized: (callback: () => void) => {
+    const sub = () => callback();
+    ipcRenderer.on(PROCESSING_EVENTS.UNAUTHORIZED, sub);
+    return () => ipcRenderer.removeListener(PROCESSING_EVENTS.UNAUTHORIZED, sub);
+  },
+
+  // 🎤 音声処理API
+  processVoiceAndScreenshot: (voiceText: string, screenshotPath: string) => 
+    ipcRenderer.invoke("process-voice-and-screenshot", { voiceText, screenshotPath }),
+  
+  processVoiceOnly: (voiceText: string) => 
+    ipcRenderer.invoke("process-voice-only", { voiceText }),
+  
+  testVoiceRecognition: (testText: string) => 
+    ipcRenderer.invoke("test-voice-recognition", { testText }),
+
+  // 🔧 デバッグ用（ElectronAPI接続確認）
+  ping: () => ipcRenderer.invoke("ping"),
+
+} as ElectronAPI)
+
+// デバッグ用ログ
+console.log("🔧 Preload.ts: ElectronAPIが初期化されました")
+
+// ElectronAPIの型定義も更新
+export interface ElectronAPI {
+  // ... 既存のメソッド
+
+  // 🎤 音声処理メソッド（型定義）
+  processVoiceAndScreenshot: (voiceText: string, screenshotPath: string) => Promise<{
+    success: boolean
+    solution?: {
+      answer: string
+      explanation: string
+      code?: string
+      suggested_responses?: string[]
+    }
+    problemInfo?: any
+    voiceText?: string
+    screenshotPath?: string
+    error?: string
+  }>
+
+  processVoiceOnly: (voiceText: string) => Promise<{
+    success: boolean
+    solution?: {
+      answer: string
+      explanation: string
+      suggested_responses?: string[]
+    }
+    problemInfo?: any
+    voiceText?: string
+    error?: string
+  }>
+
+  testVoiceRecognition: (testText: string) => Promise<{
+    success: boolean
+    received?: string
+    timestamp?: string
+    message?: string
+    error?: string
+  }>
+
+  ping: () => Promise<string>
+}

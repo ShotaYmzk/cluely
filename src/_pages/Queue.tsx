@@ -33,7 +33,6 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
   const { data: screenshots = [], refetch } = useQuery<Array<{ path: string; preview: string }>, Error>(
     ["screenshots"],
     async () => {
-      // electronAPIが存在するかチェックしてから呼び出す
       if (window.electronAPI) {
         try {
           const existing = await window.electronAPI.getScreenshots()
@@ -44,14 +43,14 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
           return []
         }
       }
-      return [] // electronAPIがない場合は空を返す
+      return []
     },
     {
       staleTime: Infinity,
       cacheTime: Infinity,
       refetchOnWindowFocus: true,
       refetchOnMount: true,
-      enabled: !!window.electronAPI // electronAPIが利用可能になってからクエリを実行
+      enabled: !!window.electronAPI
     }
   )
 
@@ -66,13 +65,10 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
 
   const handleDeleteScreenshot = async (index: number) => {
     const screenshotToDelete = screenshots[index]
-
     try {
-      // オプショナルチェイニングで安全に呼び出す
       const response = await window.electronAPI?.deleteScreenshot(
         screenshotToDelete.path
       )
-
       if (response?.success) {
         refetch()
       } else {
@@ -85,7 +81,6 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
   }
 
   useEffect(() => {
-    // APIが利用できない場合は何もしない
     if (!window.electronAPI) return;
 
     const updateDimensions = () => {
@@ -95,7 +90,6 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
         if (isTooltipVisible) {
           contentHeight += tooltipHeight
         }
-        // オプショナルチェイニングで安全に呼び出す
         window.electronAPI?.updateContentDimensions({
           width: contentWidth,
           height: contentHeight
@@ -112,13 +106,14 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
     const cleanupFunctions = [
       window.electronAPI.onScreenshotTaken(() => refetch()),
       window.electronAPI.onResetView(() => refetch()),
-      window.electronAPI.onSolutionError((error: string) => {
+      // ERROR FIX: Use the new onLlmError for handling processing errors
+      window.electronAPI.onLlmError((error: string) => {
         showToast(
           "処理失敗",
-          "スクリーンショットの処理中にエラーが発生しました。",
+          "応答の生成中にエラーが発生しました。",
           "error"
         )
-        setView("queue")
+        setView("queue") // Stay on the queue view on error
         console.error("処理エラー:", error)
       }),
       window.electronAPI.onProcessingNoScreenshots(() => {
@@ -128,7 +123,7 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
           "neutral"
         )
       })
-    ].filter(Boolean) // 存在しない可能性のある関数をフィルタリング
+    ].filter(Boolean);
 
     return () => {
       resizeObserver.disconnect()

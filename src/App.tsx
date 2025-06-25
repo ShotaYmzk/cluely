@@ -52,24 +52,24 @@ const App: React.FC = () => {
   }, [view])
 
   useEffect(() => {
-    // electronAPIが利用可能になってからリスナーを設定する
     if (window.electronAPI) {
       const cleanups = [
         window.electronAPI.onResetView(() => {
           console.log("Received 'reset-view' message from main process.")
-          queryClient.invalidateQueries() // すべてのクエリを無効化
+          queryClient.invalidateQueries()
           setView("queue")
         }),
         window.electronAPI.onSolutionStart(() => {
           setView("solutions")
           console.log("starting processing")
         }),
-        window.electronAPI.onUnauthorized?.(() => { // 念のためオプショナルに
+        // ERROR FIX: Call onUnauthorized correctly
+        window.electronAPI.onUnauthorized(() => {
           queryClient.removeQueries()
           setView("queue")
           console.log("Unauthorized")
         }),
-      ].filter(Boolean) as (() => void)[]; // undefinedを除外
+      ].filter(Boolean) as (() => void)[];
 
       return () => {
         cleanups.forEach(cleanup => cleanup());
