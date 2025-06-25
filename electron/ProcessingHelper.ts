@@ -20,6 +20,15 @@ export class ProcessingHelper {
     this.llmHelper = new LLMHelper(apiKey)
   }
 
+  // Add missing methods that are referenced in ipcHandlers.ts
+  public async processScreenshots(): Promise<void> {
+    await this.processInputs()
+  }
+
+  public async processExtraScreenshots(): Promise<void> {
+    await this.processInputs()
+  }
+
   public async processInputs(): Promise<void> {
     const mainWindow = this.appState.getMainWindow()
     if (!mainWindow || mainWindow.isDestroyed()) return
@@ -58,9 +67,23 @@ export class ProcessingHelper {
     }
 
     if (isAudio) {
-      await this.llmHelper.generateStreamFromAudio(lastInputPath, onChunk, onError, onEnd)
+      // Use existing analyzeAudioFile method instead of non-existent generateStreamFromAudio
+      try {
+        const result = await this.llmHelper.analyzeAudioFile(lastInputPath)
+        onChunk(result.text)
+        onEnd()
+      } catch (error: any) {
+        onError(error)
+      }
     } else {
-      await this.llmHelper.generateStreamFromImages(screenshotQueue, onChunk, onError, onEnd)
+      // Use existing extractProblemFromImages method instead of non-existent generateStreamFromImages
+      try {
+        const result = await this.llmHelper.extractProblemFromImages(screenshotQueue)
+        onChunk(JSON.stringify(result, null, 2))
+        onEnd()
+      } catch (error: any) {
+        onError(error)
+      }
     }
   }
 
@@ -96,8 +119,12 @@ export class ProcessingHelper {
     }
 
     try {
-      const actionResponse = await this.llmHelper.generateActionResponse(problemInfo, action)
-      mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, actionResponse)
+      // Use analyzeImageFile method since generateActionResponse doesn't exist
+      const imagePaths = this.appState.getScreenshotQueue()
+      if (imagePaths.length > 0) {
+        const actionResponse = await this.llmHelper.analyzeImageFile(imagePaths[imagePaths.length - 1])
+        mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, actionResponse)
+      }
     } catch (error: any) {
       console.error("Action response processing error:", error)
       mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, error.message)

@@ -1,63 +1,210 @@
 "use strict";
-// ipcHandlers.ts
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initializeIpcHandlers = initializeIpcHandlers;
 const electron_1 = require("electron");
 function initializeIpcHandlers(appState) {
-    electron_1.ipcMain.handle("update-content-dimensions", async (event, { width, height }) => {
-        if (width && height) {
-            appState.setWindowDimensions(width, height);
-        }
-    });
-    electron_1.ipcMain.handle("delete-screenshot", async (event, path) => {
-        return appState.deleteScreenshot(path);
-    });
+    // Existing handlers...
     electron_1.ipcMain.handle("take-screenshot", async () => {
         try {
             const screenshotPath = await appState.takeScreenshot();
-            const preview = await appState.getImagePreview(screenshotPath);
-            return { path: screenshotPath, preview };
+            return { success: true, path: screenshotPath };
         }
         catch (error) {
             console.error("Error taking screenshot:", error);
-            throw error;
+            return { success: false, error: error.message };
         }
     });
     electron_1.ipcMain.handle("get-screenshots", async () => {
-        console.log({ view: appState.getView() });
         try {
-            let previews = [];
-            if (appState.getView() === "queue") {
-                previews = await Promise.all(appState.getScreenshotQueue().map(async (path) => ({
-                    path,
-                    preview: await appState.getImagePreview(path)
-                })));
-            }
-            else {
-                previews = await Promise.all(appState.getExtraScreenshotQueue().map(async (path) => ({
-                    path,
-                    preview: await appState.getImagePreview(path)
-                })));
-            }
-            previews.forEach((preview) => console.log(preview.path));
-            return previews;
+            const screenshots = await appState.getScreenshots();
+            return screenshots;
         }
         catch (error) {
             console.error("Error getting screenshots:", error);
-            throw error;
+            return [];
         }
     });
-    electron_1.ipcMain.handle("toggle-window", async () => {
-        appState.toggleMainWindow();
+    electron_1.ipcMain.handle("get-image-preview", async (event, filepath) => {
+        try {
+            const preview = await appState.getImagePreview(filepath);
+            return preview;
+        }
+        catch (error) {
+            console.error("Error getting image preview:", error);
+            return null;
+        }
+    });
+    electron_1.ipcMain.handle("delete-screenshot", async (event, path) => {
+        try {
+            const result = await appState.deleteScreenshot(path);
+            return result;
+        }
+        catch (error) {
+            console.error("Error deleting screenshot:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    electron_1.ipcMain.handle("update-content-dimensions", async (event, dimensions) => {
+        try {
+            appState.updateContentDimensions(dimensions);
+            return { success: true };
+        }
+        catch (error) {
+            console.error("Error updating content dimensions:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    electron_1.ipcMain.handle("process-screenshots", async () => {
+        try {
+            await appState.processingHelper.processScreenshots();
+            return { success: true };
+        }
+        catch (error) {
+            console.error("Error processing screenshots:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    electron_1.ipcMain.handle("process-extra-screenshots", async () => {
+        try {
+            await appState.processingHelper.processExtraScreenshots();
+            return { success: true };
+        }
+        catch (error) {
+            console.error("Error processing extra screenshots:", error);
+            return { success: false, error: error.message };
+        }
     });
     electron_1.ipcMain.handle("reset-queues", async () => {
         try {
-            appState.clearQueues();
-            console.log("Screenshot queues have been cleared.");
+            const screenshotHelper = appState.getScreenshotHelper();
+            screenshotHelper.resetQueues();
             return { success: true };
         }
         catch (error) {
             console.error("Error resetting queues:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // **新規追加: 音声録音関連のIPCハンドラー**
+    // リアルタイム録音開始（システム音声オプション付き）
+    electron_1.ipcMain.handle("start-realtime-recording", async (event, includeSystemAudio = true) => {
+        try {
+            await appState.startRealtimeRecording(includeSystemAudio);
+            return { success: true };
+        }
+        catch (error) {
+            console.error("Error starting realtime recording:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // リアルタイム録音停止
+    electron_1.ipcMain.handle("stop-realtime-recording", async () => {
+        try {
+            appState.stopRealtimeRecording();
+            return { success: true };
+        }
+        catch (error) {
+            console.error("Error stopping realtime recording:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // 録音状態確認
+    electron_1.ipcMain.handle("is-recording", async () => {
+        try {
+            const isRecording = appState.isRecording();
+            return { success: true, isRecording };
+        }
+        catch (error) {
+            console.error("Error checking recording status:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // トランスクリプトクリア
+    electron_1.ipcMain.handle("clear-speech-transcript", async () => {
+        try {
+            appState.clearSpeechTranscript();
+            return { success: true };
+        }
+        catch (error) {
+            console.error("Error clearing transcript:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // **新規追加: オーディオデバイス関連のIPCハンドラー**
+    // 利用可能な音声デバイス一覧取得
+    electron_1.ipcMain.handle("get-audio-devices", async () => {
+        try {
+            const devices = await appState.getAudioDevices();
+            return { success: true, devices };
+        }
+        catch (error) {
+            console.error("Error getting audio devices:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // BlackHoleインストール状況確認
+    electron_1.ipcMain.handle("is-blackhole-installed", async () => {
+        try {
+            const installed = appState.isBlackHoleInstalled();
+            return { success: true, installed };
+        }
+        catch (error) {
+            console.error("Error checking BlackHole installation:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // BlackHoleインストール
+    electron_1.ipcMain.handle("install-blackhole", async () => {
+        try {
+            const result = await appState.installBlackHole();
+            return { success: result.success, message: result.message };
+        }
+        catch (error) {
+            console.error("Error installing BlackHole:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // システム音声録音テスト
+    electron_1.ipcMain.handle("test-system-audio-capture", async () => {
+        try {
+            const result = await appState.testSystemAudioCapture();
+            return { success: result.success, message: result.message };
+        }
+        catch (error) {
+            console.error("Error testing system audio capture:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // 音声権限確認
+    electron_1.ipcMain.handle("check-audio-permissions", async () => {
+        try {
+            const permissions = await appState.checkAudioPermissions();
+            return { success: true, permissions };
+        }
+        catch (error) {
+            console.error("Error checking audio permissions:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // システム音声セットアップ
+    electron_1.ipcMain.handle("setup-system-audio", async () => {
+        try {
+            const success = await appState.setupSystemAudio();
+            return { success };
+        }
+        catch (error) {
+            console.error("Error setting up system audio:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // システム音声セットアップ解除
+    electron_1.ipcMain.handle("teardown-system-audio", async () => {
+        try {
+            await appState.teardownSystemAudio();
+            return { success: true };
+        }
+        catch (error) {
+            console.error("Error tearing down system audio:", error);
             return { success: false, error: error.message };
         }
     });
@@ -94,6 +241,29 @@ function initializeIpcHandlers(appState) {
             throw error;
         }
     });
+    // **新規追加: 画面分析関連のIPCハンドラー**
+    // 自動画面分析
+    electron_1.ipcMain.handle("analyze-screen-automatically", async (event, imagePath) => {
+        try {
+            const result = await appState.analyzeScreenAutomatically(imagePath);
+            return { success: true, ...result };
+        }
+        catch (error) {
+            console.error("Error in automatic screen analysis:", error);
+            return { success: false, error: error.message };
+        }
+    });
+    // プロンプト付き画面分析
+    electron_1.ipcMain.handle("analyze-screen-with-prompt", async (event, imagePath, prompt) => {
+        try {
+            const result = await appState.analyzeScreenWithPrompt(imagePath, prompt);
+            return { success: true, ...result };
+        }
+        catch (error) {
+            console.error("Error in prompted screen analysis:", error);
+            return { success: false, error: error.message };
+        }
+    });
     // IPC handler for processing action responses
     electron_1.ipcMain.handle("process-action-response", async (event, action) => {
         try {
@@ -118,106 +288,5 @@ function initializeIpcHandlers(appState) {
     electron_1.ipcMain.handle("move-window", async (event, deltaX, deltaY) => {
         appState.moveWindow(deltaX, deltaY);
     });
-    // 🎤 音声+スクリーンショット統合処理
-    electron_1.ipcMain.handle("process-voice-and-screenshot", async (event, { voiceText, screenshotPath }) => {
-        try {
-            console.log("🎤 音声+画面解析処理開始:", { voiceText, screenshotPath });
-            // スクリーンショットパスを確認
-            if (!screenshotPath || !screenshotPath.path) {
-                throw new Error("スクリーンショットパスが無効です");
-            }
-            const imagePath = screenshotPath.path || screenshotPath;
-            // LLMHelperを使用して画像から問題を抽出
-            const problemInfo = await appState.processingHelper.getLLMHelper().extractProblemFromImages([imagePath]);
-            // 音声入力をプロンプトに追加
-            const enhancedProblemInfo = {
-                ...problemInfo,
-                voice_input: voiceText,
-                problem_statement: `${problemInfo.problem_statement}\n\n音声での質問: "${voiceText}"`,
-                context: `${problemInfo.context}\n\nユーザーが音声で「${voiceText}」と質問しています。画面の内容と音声の質問を総合的に考慮して回答してください。`
-            };
-            // AI回答生成
-            const solution = await appState.processingHelper.getLLMHelper().generateSolution(enhancedProblemInfo);
-            console.log("🤖 音声+画面解析処理完了");
-            return {
-                success: true,
-                solution,
-                problemInfo: enhancedProblemInfo,
-                voiceText,
-                screenshotPath: imagePath
-            };
-        }
-        catch (error) {
-            console.error("音声+画面解析処理でエラー:", error);
-            return {
-                success: false,
-                error: error.message,
-                solution: {
-                    answer: `処理中にエラーが発生しました: ${error.message}`
-                }
-            };
-        }
-    });
-    // 🎤 音声のみ処理
-    electron_1.ipcMain.handle("process-voice-only", async (event, { voiceText }) => {
-        try {
-            console.log("🎤 音声のみ処理開始:", voiceText);
-            // 音声入力のみの場合の処理（型を明示的に指定）
-            const problemInfo = {
-                problem_statement: `ユーザーからの音声質問: "${voiceText}"`,
-                context: "音声のみでの質問です。画面情報は利用できません。",
-                voice_input: voiceText,
-                answer: "",
-                explanation: "",
-                suggested_responses: [],
-                reasoning: ""
-            };
-            // AI回答生成
-            const solution = await appState.processingHelper.getLLMHelper().generateSolution(problemInfo);
-            console.log("🤖 音声のみ処理完了");
-            return {
-                success: true,
-                solution,
-                problemInfo,
-                voiceText
-            };
-        }
-        catch (error) {
-            console.error("音声のみ処理でエラー:", error);
-            return {
-                success: false,
-                error: error.message,
-                solution: {
-                    answer: `音声処理中にエラーが発生しました: ${error.message}。スクリーンショット機能と組み合わせてより詳細な分析を行ってください。`
-                }
-            };
-        }
-    });
-    // 🎤 音声認識テスト用（デバッグ）
-    electron_1.ipcMain.handle("test-voice-recognition", async (event, { testText }) => {
-        try {
-            console.log("🎤 音声認識テスト:", testText);
-            return {
-                success: true,
-                received: testText,
-                timestamp: new Date().toISOString(),
-                message: "音声認識テストが正常に動作しています！"
-            };
-        }
-        catch (error) {
-            console.error("音声認識テストエラー:", error);
-            return {
-                success: false,
-                error: error.message
-            };
-        }
-    });
-    console.log("🎤 音声処理IPCハンドラーが登録されました"); // デバッグ用ログ
 }
-// electron/ipcHandlers.ts の最後に追加
-// 🔧 接続テスト用pingハンドラー
-electron_1.ipcMain.handle("ping", async () => {
-    console.log("🔧 Ping受信 - ElectronAPI正常動作");
-    return "pong - ElectronAPI接続OK!";
-});
 //# sourceMappingURL=ipcHandlers.js.map

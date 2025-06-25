@@ -1,5 +1,8 @@
+// src/components/Queue/QueueCommands.tsx
 import React, { useState, useEffect, useRef } from "react"
-import { IoLogOutOutline } from "react-icons/io5"
+import { IoLogOutOutline, IoMic, IoMicOff, IoSettings, IoVolumeHigh, IoSettingsSharp, IoRefresh } from "react-icons/io5"
+import VoiceRecording from "./VoiceRecording"
+import AudioSettings from "../../Audio/AudioSettings"
 import MarkdownRenderer from "../ui/MarkdownRenderer"
 
 interface QueueCommandsProps {
@@ -7,16 +10,26 @@ interface QueueCommandsProps {
   screenshots: Array<{ path: string; preview: string }>
 }
 
+interface VoiceTranscript {
+  text: string
+  timestamp: number
+  isInterim: boolean
+  isFinal: boolean
+}
+
 const QueueCommands: React.FC<QueueCommandsProps> = ({
   onTooltipVisibilityChange,
   screenshots
 }) => {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
-  const tooltipRef = useRef<HTMLDivElement>(null)
   const [isRecording, setIsRecording] = useState(false)
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
-  const [audioResult, setAudioResult] = useState<string | null>(null)
-  const chunks = useRef<Blob[]>([])
+  const [showVoicePanel, setShowVoicePanel] = useState(false)
+  const [showAudioSettings, setShowAudioSettings] = useState(false)
+  const [currentTranscript, setCurrentTranscript] = useState("")
+  const [includeSystemAudio, setIncludeSystemAudio] = useState(true)
+  const [blackHoleAvailable, setBlackHoleAvailable] = useState(false)
+  
+  const tooltipRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let tooltipHeight = 0
@@ -24,7 +37,58 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
       tooltipHeight = tooltipRef.current.offsetHeight + 10
     }
     onTooltipVisibilityChange(isTooltipVisible, tooltipHeight)
-  }, [isTooltipVisible])
+  }, [isTooltipVisible, onTooltipVisibilityChange])
+
+  useEffect(() => {
+    // Set up keyboard shortcuts
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Command/Ctrl + R でトランスクリプトクリア
+      if ((event.metaKey || event.ctrlKey) && event.key === 'r') {
+        event.preventDefault()
+        handleClearTranscript()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  useEffect(() => {
+    // Listen for recording state changes
+    const cleanups = [
+      window.electronAPI.onSpeechRecordingStarted((data) => {
+        setIsRecording(true)
+        setShowVoicePanel(true)
+        // Check if BlackHole is available and system audio is included
+        if (data.blackHoleAvailable !== undefined) {
+          setBlackHoleAvailable(data.blackHoleAvailable)
+        }
+      }),
+      window.electronAPI.onSpeechRecordingStopped(() => {
+        setIsRecording(false)
+      })
+    ]
+
+    return () => {
+      cleanups.forEach(cleanup => cleanup())
+    }
+  }, [])
+
+  useEffect(() => {
+    // Check BlackHole availability on component mount
+    const checkBlackHole = async () => {
+      try {
+        const result = await window.electronAPI.isBlackHoleInstalled()
+        if (result.success) {
+          setBlackHoleAvailable(result.installed || false)
+        }
+      } catch (error) {
+        console.error("Failed to check BlackHole status:", error)
+      }
+    }
+
+    checkBlackHole()
+  }, [])
 
   const handleMouseEnter = () => {
     setIsTooltipVisible(true)
@@ -34,40 +98,36 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
     setIsTooltipVisible(false)
   }
 
-  const handleRecordClick = async () => {
-    if (!isRecording) {
-      // Start recording
+  const handleVoiceToggle = async () => {
+    if (isRecording) {
+      // Stop recording
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        const recorder = new MediaRecorder(stream)
-        recorder.ondataavailable = (e) => chunks.current.push(e.data)
-        recorder.onstop = async () => {
-          const blob = new Blob(chunks.current, { type: chunks.current[0]?.type || 'audio/webm' })
-          chunks.current = []
-          const reader = new FileReader()
-          reader.onloadend = async () => {
-            const base64Data = (reader.result as string).split(',')[1]
-            try {
-              const result = await window.electronAPI.analyzeAudioFromBase64(base64Data, blob.type)
-              setAudioResult(result.text)
-            } catch (err) {
-              setAudioResult('音声分析に失敗しました。')
-            }
-          }
-          reader.readAsDataURL(blob)
-        }
-        setMediaRecorder(recorder)
-        recorder.start()
-        setIsRecording(true)
-      } catch (err) {
-        setAudioResult('録音を開始できませんでした。')
+        await window.electronAPI.stopRealtimeRecording()
+      } catch (error) {
+        console.error("Failed to stop recording:", error)
       }
     } else {
-      // Stop recording
-      mediaRecorder?.stop()
-      setIsRecording(false)
-      setMediaRecorder(null)
+      // Start recording with system audio option
+      try {
+        setShowVoicePanel(true)
+        await window.electronAPI.startRealtimeRecording(includeSystemAudio)
+      } catch (error) {
+        console.error("Failed to start recording:", error)
+      }
     }
+  }
+
+  const handleClearTranscript = async () => {
+    try {
+      await window.electronAPI.clearSpeechTranscript()
+      setCurrentTranscript("")
+    } catch (error) {
+      console.error("Failed to clear transcript:", error)
+    }
+  }
+
+  const handleTranscriptChange = (transcript: string) => {
+    setCurrentTranscript(transcript)
   }
 
   return (
@@ -116,20 +176,56 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
           </div>
         )}
 
-        {/* Voice Recording Button */}
+        {/* Voice Recording Button - Improved */}
         <div className="flex items-center gap-2">
           <button
-            className={`bg-white/10 hover:bg-white/20 transition-colors rounded-md px-2 py-1 text-[11px] leading-none text-white/70 flex items-center gap-1 ${isRecording ? 'bg-red-500/70 hover:bg-red-500/90' : ''}`}
-            onClick={handleRecordClick}
+            className={`transition-all rounded-md px-3 py-1.5 text-[11px] leading-none flex items-center gap-1.5 font-medium ${
+              isRecording 
+                ? 'bg-red-500/80 hover:bg-red-500/90 text-white shadow-lg shadow-red-500/25' 
+                : 'bg-white/10 hover:bg-white/20 text-white/80'
+            }`}
+            onClick={handleVoiceToggle}
             type="button"
+            title={isRecording ? "音声録音を停止" : "リアルタイム音声録音を開始"}
           >
             {isRecording ? (
-              <span className="animate-pulse">● 録音停止</span>
+              <>
+                <IoMicOff className="w-3 h-3" />
+                <span className="animate-pulse">録音中</span>
+                <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+              </>
             ) : (
-              <span>🎤録音</span>
+              <>
+                <IoMic className="w-3 h-3" />
+                <span>音声録音</span>
+                {blackHoleAvailable && includeSystemAudio && (
+                  <span className="text-[9px] bg-blue-500/30 px-1 py-0.5 rounded">SYS</span>
+                )}
+              </>
             )}
           </button>
+
+          {/* Audio Settings Button */}
+          <button
+            onClick={() => setShowAudioSettings(true)}
+            className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md transition-colors"
+            title="音声設定"
+          >
+            <IoSettings className="w-3 h-3 text-white/70" />
+          </button>
         </div>
+
+        {/* Voice Panel Toggle */}
+        {currentTranscript && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowVoicePanel(!showVoicePanel)}
+              className="text-[11px] leading-none text-white/60 hover:text-white/80 transition-colors"
+            >
+              {showVoicePanel ? "音声パネルを隠す" : "音声パネルを表示"}
+            </button>
+          </div>
+        )}
 
         {/* Question mark with tooltip */}
         <div
@@ -203,6 +299,38 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                         現在の問題に基づいてソリューションを生成します。
                       </p>
                     </div>
+
+                    {/* Voice Commands */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="truncate">音声録音</span>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
+                            🎤
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] leading-relaxed text-white/70">
+                        リアルタイム音声録音と文字起こし。マイクとシステム音声の両方を録音できます。
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="truncate">トランスクリプトクリア</span>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
+                            ⌘
+                          </span>
+                          <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
+                            R
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] leading-relaxed text-white/70 truncate">
+                        音声文字起こしの履歴をクリアします。
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -222,15 +350,22 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
           <IoLogOutOutline className="w-4 h-4" />
         </button>
       </div>
-      {/* Audio Result Display */}
-      {audioResult && (
-        <div className="mt-2 p-3 bg-white/10 rounded-lg text-white max-w-md">
-          <div className="font-semibold text-xs mb-2">音声結果:</div>
-          <div className="text-xs">
-            <MarkdownRenderer content={audioResult} className="text-xs" />
-          </div>
+
+      {/* Voice Recording Panel */}
+      {showVoicePanel && (
+        <div className="mt-3 w-full min-w-96 max-w-2xl">
+          <VoiceRecording
+            onTranscriptChange={handleTranscriptChange}
+            className="w-full"
+          />
         </div>
       )}
+
+      {/* Audio Settings Modal */}
+      <AudioSettings
+        isVisible={showAudioSettings}
+        onClose={() => setShowAudioSettings(false)}
+      />
     </div>
   )
 }

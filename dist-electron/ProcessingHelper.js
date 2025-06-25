@@ -20,6 +20,13 @@ class ProcessingHelper {
         }
         this.llmHelper = new LLMHelper_1.LLMHelper(apiKey);
     }
+    // Add missing methods that are referenced in ipcHandlers.ts
+    async processScreenshots() {
+        await this.processInputs();
+    }
+    async processExtraScreenshots() {
+        await this.processInputs();
+    }
     async processInputs() {
         const mainWindow = this.appState.getMainWindow();
         if (!mainWindow || mainWindow.isDestroyed())
@@ -53,10 +60,26 @@ class ProcessingHelper {
             this.currentProcessingAbortController = null;
         };
         if (isAudio) {
-            await this.llmHelper.generateStreamFromAudio(lastInputPath, onChunk, onError, onEnd);
+            // Use existing analyzeAudioFile method instead of non-existent generateStreamFromAudio
+            try {
+                const result = await this.llmHelper.analyzeAudioFile(lastInputPath);
+                onChunk(result.text);
+                onEnd();
+            }
+            catch (error) {
+                onError(error);
+            }
         }
         else {
-            await this.llmHelper.generateStreamFromImages(screenshotQueue, onChunk, onError, onEnd);
+            // Use existing extractProblemFromImages method instead of non-existent generateStreamFromImages
+            try {
+                const result = await this.llmHelper.extractProblemFromImages(screenshotQueue);
+                onChunk(JSON.stringify(result, null, 2));
+                onEnd();
+            }
+            catch (error) {
+                onError(error);
+            }
         }
     }
     cancelOngoingRequests() {
@@ -86,8 +109,12 @@ class ProcessingHelper {
             return;
         }
         try {
-            const actionResponse = await this.llmHelper.generateActionResponse(problemInfo, action);
-            mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, actionResponse);
+            // Use analyzeImageFile method since generateActionResponse doesn't exist
+            const imagePaths = this.appState.getScreenshotQueue();
+            if (imagePaths.length > 0) {
+                const actionResponse = await this.llmHelper.analyzeImageFile(imagePaths[imagePaths.length - 1]);
+                mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, actionResponse);
+            }
         }
         catch (error) {
             console.error("Action response processing error:", error);

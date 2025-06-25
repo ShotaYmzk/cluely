@@ -5,13 +5,15 @@
   "scripts": {
     "clean": "rimraf dist dist-electron",
     "dev": "vite",
-    "build": "vite build && electron-builder",
+    "build": "npm run clean && tsc && vite build",
     "preview": "vite preview",
-    "electron:dev": "tsc -p electron/tsconfig.json && electron .",
-    "app:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env electron .\"",
+    "electron:dev": "NODE_ENV=development ELECTRON_IS_DEV=true tsc -p electron/tsconfig.json && electron .",
+    "electron:dev-wait": "wait-on http://localhost:5173 && npm run electron:dev",
+    "app:dev": "concurrently \"npm run dev\" \"npm run electron:dev-wait\"",
     "app:build": "npm run build && electron-builder",
     "watch": "tsc -p electron/tsconfig.json --watch",
-    "gemini-model": "node ./electron/show-gemini-model.js"
+    "gemini-model": "node ./electron/show-gemini-model.js",
+    "dev-debug": "NODE_ENV=development ELECTRON_IS_DEV=true DEBUG=1 tsc -p electron/tsconfig.json && electron . --remote-debugging-port=9222"
   },
   "build": {
     "appId": "com.electron.interview-coder",
@@ -30,7 +32,16 @@
         "dmg",
         "zip"
       ],
-      "icon": "assets/icons/mac/icon.icns"
+      "icon": "assets/icons/mac/icon.icns",
+      "extendInfo": {
+        "NSCameraUseContinuityCameraDeviceType": true,
+        "NSMicrophoneUsageDescription": "このアプリは音声録音・文字起こし機能のためにマイクアクセスが必要です",
+        "NSCameraUsageDescription": "このアプリは画面分析機能のためにカメラアクセスが必要です",
+        "NSSpeechRecognitionUsageDescription": "このアプリは音声認識機能のために音声認識アクセスが必要です",
+        "NSSystemAdministrationUsageDescription": "このアプリは画面録画・スクリーンショット機能のためにシステム管理権限が必要です"
+      },
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist"
     },
     "win": {
       "target": [
@@ -87,7 +98,8 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^0.12.0",
+    "@google/generative-ai": "^0.2.1",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.2",
     "@tailwindcss/typography": "^0.5.16",

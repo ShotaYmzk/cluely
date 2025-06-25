@@ -60,8 +60,29 @@ class ScreenshotHelper {
         });
         this.extraScreenshotQueue = [];
     }
+    resetQueues() {
+        this.clearQueues();
+    }
+    async getScreenshots() {
+        const screenshots = [];
+        for (const path of this.screenshotQueue) {
+            try {
+                const preview = await this.getImagePreview(path);
+                screenshots.push({ path, preview });
+            }
+            catch (error) {
+                console.error(`Error getting preview for ${path}:`, error);
+                // Include the path even if preview fails
+                screenshots.push({ path, preview: '' });
+            }
+        }
+        return screenshots;
+    }
     async takeScreenshot(hideMainWindow, showMainWindow) {
-        hideMainWindow();
+        // Provide default no-op functions if not provided
+        const hideWindow = hideMainWindow || (() => { });
+        const showWindow = showMainWindow || (() => { });
+        hideWindow();
         // 少し待機してウィンドウが完全に隠れるのを待つ
         await new Promise(resolve => setTimeout(resolve, 300));
         let screenshotPath = "";
@@ -128,7 +149,7 @@ class ScreenshotHelper {
         finally {
             // 少し待機してからウィンドウを表示
             await new Promise(resolve => setTimeout(resolve, 200));
-            showMainWindow();
+            showWindow();
         }
         return screenshotPath;
     }
