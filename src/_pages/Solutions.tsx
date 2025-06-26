@@ -12,6 +12,10 @@ import {
   ToastTitle,
   ToastVariant
 } from "../components/ui/toast"
+// ★★★ 変更点: 新しいコンポーネントをインポート ★★★
+import { ContentSection } from "../components/Solutions/ContentSection"
+import { ComplexitySection } from "../components/Solutions/ComplexitySection"
+import { useQueryClient } from "react-query"
 
 interface SolutionsProps {
   setView: React.Dispatch<React.SetStateAction<"queue" | "solutions" | "debug">>
@@ -22,11 +26,15 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
   const [isStreaming, setIsStreaming] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
+  // ソリューションデータを管理するStateを追加
+  const [solutionData, setSolutionData] = useState<any>(null)
+
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<ToastMessage>({ title: "", description: "", variant: "neutral" })
   
   const contentRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const queryClient = useQueryClient();
 
   const showToast = (title: string, description: string, variant: ToastVariant) => {
     setToastMessage({ title, description, variant })
@@ -34,15 +42,26 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
   }
 
   useEffect(() => {
-    // ストリーミングイベントの購読
+    let accumulatedData = "";
     const cleanupFunctions = [
       window.electronAPI.onLlmChunk((chunk: string) => {
         setIsStreaming(true)
-        setError(null) // 新しいデータが来たらエラーをクリア
-        setLlmResponse((prev) => prev + chunk)
+        setError(null)
+        accumulatedData += chunk;
+        setLlmResponse(accumulatedData)
       }),
       window.electronAPI.onLlmStreamEnd(() => {
         setIsStreaming(false)
+        try {
+          // ストリーミング完了後にJSONとしてパース
+          const parsedData = JSON.parse(accumulatedData);
+          setSolutionData(parsedData);
+          queryClient.setQueryData("solution", parsedData); // React Queryにキャッシュ
+        } catch (e) {
+          console.error("Failed to parse LLM response JSON:", e);
+          setError("AIからの応答形式が正しくありません。");
+          setSolutionData({ answer: accumulatedData }); // パース失敗時はテキストとして表示
+        }
       }),
       window.electronAPI.onLlmError((errorMessage: string) => {
         setError(errorMessage)
@@ -57,17 +76,14 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
     return () => {
       cleanupFunctions.forEach((cleanup) => cleanup())
     }
-  }, [setView])
+  }, [setView, queryClient])
 
   useEffect(() => {
-    // コンテンツの高さに応じてウィンドウサイズを調整し、自動スクロール
     const updateAndScroll = () => {
       if (contentRef.current) {
-        const contentHeight = contentRef.current.scrollHeight
-        const contentWidth = contentRef.current.scrollWidth
         window.electronAPI.updateContentDimensions({
-          width: contentWidth,
-          height: contentHeight
+          width: contentRef.current.scrollWidth,
+          height: contentRef.current.scrollHeight
         })
       }
       if (scrollRef.current) {
@@ -76,16 +92,10 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
     }
     
     updateAndScroll();
-
     const resizeObserver = new ResizeObserver(updateAndScroll)
-    if (contentRef.current) {
-      resizeObserver.observe(contentRef.current)
-    }
-
-    return () => {
-      resizeObserver.disconnect()
-    }
-  }, [llmResponse, error]) // レスポンスかエラーが更新されるたびに実行
+    if (contentRef.current) resizeObserver.observe(contentRef.current)
+    return () => resizeObserver.disconnect()
+  }, [llmResponse, error, solutionData])
 
   return (
     <div ref={contentRef} className="w-full h-full">
@@ -104,17 +114,51 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
 
         <div 
           ref={scrollRef} 
-          className="w-full text-sm text-white bg-black/60 rounded-md overflow-y-auto max-h-[80vh]"
+          className="w-full text-sm text-white bg-black/60 rounded-md overflow-y-auto max-h-[90vh]"
         >
-          <div className="p-4 min-h-[50px]">
-            {llmResponse ? (
-              <MarkdownRenderer content={llmResponse} className="text-[13px]" />
-            ) : isStreaming ? (
-              <p className="text-gray-300 animate-pulse">応答を生成中...</p>
-            ) : null}
-            
-            {isStreaming && !error && (
-              <div className="inline-block h-4 w-1 bg-white animate-pulse ml-1 align-bottom" />
+          <div className="p-4 space-y-4 min-h-[50px]">
+            {isStreaming && !solutionData && (
+              <p className="text-gray-300 animate-pulse">AIが応答を生成中...</p>
+            )}
+
+            {solutionData && (
+              <>
+                <ContentSection
+                  title="問題の要約"
+                  isLoading={false}
+                  content={
+                    <MarkdownRenderer 
+                      content={solutionData.problem_statement || "要約がありません。"} 
+                      className="text-[13px]" 
+                    />
+                  }
+                />
+                <ContentSection
+                  title="解決策"
+                  isLoading={false}
+                  content={
+                    <MarkdownRenderer 
+                      content={solutionData.answer || "解決策がありません。"} 
+                      className="text-[13px]" 
+                    />
+                  }
+                />
+                <ContentSection
+                  title="説明"
+                  isLoading={false}
+                  content={
+                    <MarkdownRenderer 
+                      content={solutionData.explanation || "説明がありません。"} 
+                      className="text-[13px]" 
+                    />
+                  }
+                />
+                <ComplexitySection
+                  isLoading={false}
+                  timeComplexity={solutionData.complexity?.time || "N/A"}
+                  spaceComplexity={solutionData.complexity?.space || "N/A"}
+                />
+              </>
             )}
 
             {error && (
