@@ -85,7 +85,7 @@ export class LLMHelper {
       };
       const prompt = `${this.systemPrompt}\n\nこの音声クリップを短く簡潔に説明してください。メインの回答に加えて、音声に基づいてユーザーが次に取れる可能性のある複数の具体的なアクションや回答を提案してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答し、簡潔にしてください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite-preview-06-17",
         contents: [prompt, audioPart]
       });
       const text = response.text;
@@ -107,7 +107,7 @@ export class LLMHelper {
       };
       const prompt = `${this.systemPrompt}\n\nこの画像の内容を短く簡潔に説明してください。メインの回答に加えて、画像に基づいてユーザーが次に取れる可能性のある複数の具体的なアクションや回答を提案してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答してください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite-preview-06-17",
         contents: [prompt, imagePart]
       });
       const text = response.text;
@@ -129,7 +129,7 @@ export class LLMHelper {
       };
       const prompt = `${this.systemPrompt}\n\nこの音声ファイルを分析して内容を説明してください。メインの回答に加えて、音声の内容に基づいてユーザーが次に取れる可能性のある複数の具体的なアクションや回答を提案してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite-preview-06-17",
         contents: [prompt, audioPart]
       });
       const text = response.text;
@@ -169,7 +169,7 @@ export class LLMHelper {
 画面の内容に基づいて、直接的で有用な分析と提案を提供してください。`
 
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite-preview-06-17",
         contents: [prompt, imagePart]
       });
       const text = response.text;
@@ -212,7 +212,7 @@ export class LLMHelper {
 画面の内容とユーザーの質問の両方を考慮して、最も有用な回答を提供してください。`
 
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite-preview-06-17",
         contents: [prompt, imagePart]
       });
       const text = response.text;
