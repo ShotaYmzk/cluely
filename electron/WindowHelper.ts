@@ -92,8 +92,9 @@ export class WindowHelper {
     })
 
     if (isDev) {
-      this.mainWindow.webContents.openDevTools({ mode: 'detach' })
-      console.log("🛠️  DevTools opened for debugging")
+      // DevToolsの自動オープンを無効化（手動で開く場合はCommand+Option+Iを使用）
+      // this.mainWindow.webContents.openDevTools({ mode: 'detach' })
+      console.log("🛠️  Development mode - DevTools can be opened manually with Command+Option+I")
     }
 
     this.mainWindow.setContentProtection(true)

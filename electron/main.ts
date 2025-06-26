@@ -160,6 +160,14 @@ export class AppState {
   public isRecording(): boolean { return this.speechHelper.isCurrentlyRecording() }
   public clearSpeechTranscript(): void { this.speechHelper.clearTranscript() }
 
+  // メッセージをレンダラープロセスに送信
+  public sendToRenderer(event: string, data?: any): void {
+    const mainWindow = this.getMainWindow()
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(event, data)
+    }
+  }
+
   // Audio Helper methods
   public async getAudioDevices() { return this.speechHelper.getAudioDevices() }
   public isBlackHoleInstalled(): boolean { return this.speechHelper.isBlackHoleInstalled() }

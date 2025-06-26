@@ -49,7 +49,7 @@ export class ShortcutsHelper {
         console.error(`❌ Failed to register shortcut: ${screenshotShortcut}`, error)
       }
 
-      // **新規追加: 自動分析機能 - Cmd/Ctrl + Enter**
+      // **自動分析機能 - Cmd/Ctrl + Enter**
       const autoAnalyzeShortcut = "CommandOrControl+Return"
       try {
         globalShortcut.register(autoAnalyzeShortcut, async () => {
@@ -67,8 +67,26 @@ export class ShortcutsHelper {
         console.error(`❌ Failed to register shortcut: ${autoAnalyzeShortcut}`, error)
       }
 
-      // **新規追加: 音声録音切り替え - Cmd/Ctrl + R**
-      const voiceToggleShortcut = "CommandOrControl+R"
+      // **チャット履歴全消去 - Cmd/Ctrl + R**
+      const resetChatShortcut = "CommandOrControl+R"
+      try {
+        globalShortcut.register(resetChatShortcut, async () => {
+          console.log(`${resetChatShortcut} pressed - clearing chat history`)
+          try {
+            // チャット履歴をリセット
+            this.appState.sendToRenderer("reset-view")
+          } catch (error) {
+            console.error("Error clearing chat history:", error)
+          }
+        })
+        this.registeredShortcuts.push(resetChatShortcut)
+        console.log(`✅ Registered shortcut: ${resetChatShortcut}`)
+      } catch (error) {
+        console.error(`❌ Failed to register shortcut: ${resetChatShortcut}`, error)
+      }
+
+      // **音声録音切り替え - Cmd/Ctrl + M**
+      const voiceToggleShortcut = "CommandOrControl+M"
       try {
         globalShortcut.register(voiceToggleShortcut, async () => {
           console.log(`${voiceToggleShortcut} pressed - toggling voice recording`)
@@ -88,7 +106,7 @@ export class ShortcutsHelper {
         console.error(`❌ Failed to register shortcut: ${voiceToggleShortcut}`, error)
       }
 
-      // **新規追加: クイック問題解決 - Cmd/Ctrl + Shift + Enter**
+      // **クイック問題解決 - Cmd/Ctrl + Shift + Enter**
       const quickSolveShortcut = "CommandOrControl+Shift+Return"
       try {
         globalShortcut.register(quickSolveShortcut, async () => {
@@ -264,7 +282,8 @@ export class ShortcutsHelper {
       "CommandOrControl+H": "スクリーンショット撮影",
       "CommandOrControl+Return": "分析プロンプト表示（スクリーンショット分析）",
       "CommandOrControl+Shift+Return": "クイック問題解決（自動スクリーンショット + 分析）",
-      "CommandOrControl+R": "音声録音の開始/停止",
+      "CommandOrControl+R": "チャット履歴全消去・新しいチャット開始",
+      "CommandOrControl+M": "音声録音の開始/停止",
       "CommandOrControl+Left": "ウィンドウを左に移動",
       "CommandOrControl+Right": "ウィンドウを右に移動", 
       "CommandOrControl+Up": "ウィンドウを上に移動",

@@ -128,7 +128,6 @@ const App: React.FC = () => {
           setStreamingContent("")
           setIsStreaming(false)
           
-          // 入力フィールドにフォーカスを戻す
           if (inputRef.current) {
             inputRef.current.focus()
           }
@@ -304,8 +303,8 @@ const App: React.FC = () => {
     >
       {/* 常にミニマルタブを表示 */}
       <div 
-        className="flex items-center justify-center gap-2 px-2 py-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg"
-        style={{ minWidth: '280px', maxWidth: '320px' }}
+        className="flex items-center justify-center gap-10 px-2 py-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg"
+        style={{ minWidth: '280px', maxWidth: '500px' }}
       >
         <button
           onClick={handleListenToggle}
@@ -314,17 +313,15 @@ const App: React.FC = () => {
           }`}
           style={{ cursor: 'default' }}
         >
-          {isListening ? 'listening' : 'listen'}
+          {isListening ? 'listening' : 'listen'} ⌘+M
         </button>
-        
         <button
           onClick={handleAskPrompt}
           className="text-white/60 hover:text-white text-sm transition-colors"
           style={{ cursor: 'default' }}
         >
-          ask⌘+↩︎
+          ask ⌘+↩︎
         </button>
-        
         <button
           onClick={handleShowHide}
           className="text-white/60 hover:text-white text-sm transition-colors"
@@ -332,21 +329,20 @@ const App: React.FC = () => {
         >
           show/hide ⌘+B
         </button>
-        
         <button 
           onClick={() => setShowHelp(!showHelp)}
           className="text-white/60 hover:text-white/80 text-sm transition-colors"
           style={{ cursor: 'default' }}
         >
-          ...
+          help
         </button>
-        
         {showHelp && (
           <div className="absolute top-full left-0 mt-2 p-3 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 shadow-xl z-50 text-xs text-white/80 whitespace-nowrap">
             <div className="space-y-1">
               <div><span className="text-white/60">Command + B:</span> アプリの表示/非表示切り替え</div>
               <div><span className="text-white/60">Command + Enter:</span> 画面分析（音声録音中なら音声+画面分析）</div>
-              <div><span className="text-white/60">Command + R:</span> 音声録音の開始/停止</div>
+              <div><span className="text-white/60">Command + R:</span> チャット履歴全消去・新しいチャット開始</div>
+              <div><span className="text-white/60">Command + M:</span> 音声録音の開始/停止</div>
               <div><span className="text-white/60">Command + H:</span> スクリーンショット撮影</div>
               <div><span className="text-white/60">Shift + Enter:</span> 改行</div>
             </div>
@@ -358,7 +354,7 @@ const App: React.FC = () => {
       {isInputExpanded && (
         <div 
           className="mt-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg"
-          style={{ minWidth: '280px', maxWidth: '320px' }}
+          style={{ minWidth: '280px', maxWidth: '500px' }}
         >
           <form onSubmit={handleSubmit} className="p-2">
             <textarea
@@ -366,7 +362,7 @@ const App: React.FC = () => {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="画面について質問する（空白のままEnterで画面分析のみ実行）..."
+              placeholder="画面について質問する..."
               disabled={isStreaming}
               rows={2}
               className="w-full bg-white/10 border border-white/20 rounded px-3 py-2 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent disabled:opacity-50 resize-none"
@@ -379,7 +375,7 @@ const App: React.FC = () => {
       {/* メッセージエリア - メッセージがある場合のみ表示 */}
       {hasContent && (
         <div 
-          className="mt-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg max-w-lg"
+          className="mt-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg max-w-3xl"
         >
           <div className="px-4 py-3 max-h-96 overflow-y-auto">
             {messages.map((message) => (
@@ -436,7 +432,8 @@ const App: React.FC = () => {
                 <div className="space-y-1">
                   <div><span className="text-white/60">Command + B:</span> アプリの表示/非表示切り替え</div>
                   <div><span className="text-white/60">Command + Enter:</span> 画面分析（音声録音中なら音声+画面分析）</div>
-                  <div><span className="text-white/60">Command + R:</span> 音声録音の開始/停止</div>
+                  <div><span className="text-white/60">Command + R:</span> チャット履歴全消去・新しいチャット開始</div>
+                  <div><span className="text-white/60">Command + M:</span> 音声録音の開始/停止</div>
                   <div><span className="text-white/60">Command + H:</span> スクリーンショット撮影</div>
                   <div><span className="text-white/60">Shift + Enter:</span> 改行</div>
                 </div>

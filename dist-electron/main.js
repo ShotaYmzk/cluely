@@ -277,8 +277,7 @@ class WindowHelper {
       resizable: true
     });
     if (isDev) {
-      this.mainWindow.webContents.openDevTools({ mode: "detach" });
-      console.log("🛠️  DevTools opened for debugging");
+      console.log("🛠️  Development mode - DevTools can be opened manually with Command+Option+I");
     }
     this.mainWindow.setContentProtection(true);
     if (process.platform === "darwin") {
@@ -4289,7 +4288,22 @@ class ShortcutsHelper {
       } catch (error) {
         console.error(`❌ Failed to register shortcut: ${autoAnalyzeShortcut}`, error);
       }
-      const voiceToggleShortcut = "CommandOrControl+R";
+      const resetChatShortcut = "CommandOrControl+R";
+      try {
+        electron.globalShortcut.register(resetChatShortcut, async () => {
+          console.log(`${resetChatShortcut} pressed - clearing chat history`);
+          try {
+            this.appState.sendToRenderer("reset-view");
+          } catch (error) {
+            console.error("Error clearing chat history:", error);
+          }
+        });
+        this.registeredShortcuts.push(resetChatShortcut);
+        console.log(`✅ Registered shortcut: ${resetChatShortcut}`);
+      } catch (error) {
+        console.error(`❌ Failed to register shortcut: ${resetChatShortcut}`, error);
+      }
+      const voiceToggleShortcut = "CommandOrControl+M";
       try {
         electron.globalShortcut.register(voiceToggleShortcut, async () => {
           console.log(`${voiceToggleShortcut} pressed - toggling voice recording`);
@@ -4461,7 +4475,8 @@ class ShortcutsHelper {
       "CommandOrControl+H": "スクリーンショット撮影",
       "CommandOrControl+Return": "分析プロンプト表示（スクリーンショット分析）",
       "CommandOrControl+Shift+Return": "クイック問題解決（自動スクリーンショット + 分析）",
-      "CommandOrControl+R": "音声録音の開始/停止",
+      "CommandOrControl+R": "チャット履歴全消去・新しいチャット開始",
+      "CommandOrControl+M": "音声録音の開始/停止",
       "CommandOrControl+Left": "ウィンドウを左に移動",
       "CommandOrControl+Right": "ウィンドウを右に移動",
       "CommandOrControl+Up": "ウィンドウを上に移動",
@@ -109614,6 +109629,13 @@ const _AppState = class _AppState {
   }
   clearSpeechTranscript() {
     this.speechHelper.clearTranscript();
+  }
+  // メッセージをレンダラープロセスに送信
+  sendToRenderer(event, data) {
+    const mainWindow = this.getMainWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(event, data);
+    }
   }
   // Audio Helper methods
   async getAudioDevices() {

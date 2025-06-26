@@ -134,7 +134,8 @@ const AnalysisPromptDialog: React.FC<AnalysisPromptDialogProps> = ({
               onChange={(e) => setPrompt(e.target.value)}
               disabled={isLoading}
               placeholder="画面について質問したいことを入力してください。空白の場合は自動で分析します。"
-              className="w-full h-24 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/50 resize-none disabled:opacity-50"
+              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/50 resize-none disabled:opacity-50"
+              rows={2}
             />
             <div className="flex items-center justify-between text-xs text-white/60">
               <span>Enter: 送信 | Shift+Enter: 改行 | Esc: キャンセル</span>
