@@ -167,6 +167,31 @@ function initializeIpcHandlers(appState) {
       return { success: false, error: error.message };
     }
   });
+  electron.ipcMain.handle("analyze-current-screen", async () => {
+    try {
+      const screenshotPath = await appState.takeScreenshot();
+      let prompt = "画面の内容を詳しく分析してください。";
+      if (appState.isRecording()) {
+        prompt += " 現在音声も録音中です。画面の情報と合わせて総合的に分析してください。";
+      }
+      const result = await appState.analyzeScreenWithPrompt(screenshotPath, prompt);
+      return result.text || "分析結果を取得できませんでした。";
+    } catch (error) {
+      console.error("Error in analyze-current-screen handler:", error);
+      return "画面分析中にエラーが発生しました。";
+    }
+  });
+  electron.ipcMain.handle("toggle-window", () => {
+    try {
+      if (appState.isVisible()) {
+        appState.hideMainWindow();
+      } else {
+        appState.showMainWindow();
+      }
+    } catch (error) {
+      console.error("Error toggling window:", error);
+    }
+  });
   electron.ipcMain.handle("process-action-response", async (event, action) => {
     try {
       await appState.processingHelper.processActionResponse(action);
@@ -108530,7 +108555,7 @@ class LLMHelper {
 - 回答が複数ある場合は、最も適切な回答を選んでください
 - JSONオブジェクトのみを返してください。マークダウン形式やコードブロックは含めないでください。`;
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite-preview-06-17",
         contents: [prompt, ...imageParts]
       });
       const text = response.text;

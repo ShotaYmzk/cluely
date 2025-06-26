@@ -2,6 +2,7 @@ export interface ElectronAPI {
   // --- General ---
   updateContentDimensions: (dimensions: { width: number; height: number }) => Promise<{ success: boolean }>
   quitApp: () => Promise<void>
+  toggleWindow: () => Promise<void>
   
   // --- Screenshots ---
   takeScreenshot: () => Promise<{ success: boolean; path?: string; error?: string }>
@@ -19,6 +20,8 @@ export interface ElectronAPI {
   // --- Audio ---
   startRealtimeRecording: (includeSystemAudio?: boolean) => Promise<{ success: boolean; error?: string; isRecording?: boolean }>
   stopRealtimeRecording: () => Promise<{ success: boolean; error?: string }>
+  startRecording: () => Promise<{ success: boolean; error?: string; isRecording?: boolean }>
+  stopRecording: () => Promise<{ success: boolean; error?: string }>
   isRecording: () => Promise<{ success: boolean; error?: string; isRecording?: boolean }>
   clearSpeechTranscript: () => Promise<{ success: boolean; error?: string }>
   analyzeAudioChunk: (args: { base64Data: string; mimeType: string }) => Promise<{ success: boolean; error?: string }>
@@ -35,6 +38,7 @@ export interface ElectronAPI {
   // --- Screen Analysis ---
   analyzeScreenAutomatically: (imagePath: string) => Promise<{ success: boolean; text?: string; error?: string }>
   analyzeScreenWithPrompt: (imagePath: string, prompt: string) => Promise<{ success: boolean; text?: string; error?: string }>
+  analyzeCurrentScreen: () => Promise<string>
 
   // --- Audio Analysis (Legacy) ---
   analyzeAudioFromBase64: (data: string, mimeType: string) => Promise<{ text: string; timestamp: number }>

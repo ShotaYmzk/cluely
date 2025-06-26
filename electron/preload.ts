@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   updateContentDimensions: (dimensions: { width: number; height: number }) =>
     ipcRenderer.invoke("update-content-dimensions", dimensions),
   quitApp: () => ipcRenderer.invoke("quit-app"),
+  toggleWindow: () => ipcRenderer.invoke("toggle-window"),
   
   // --- Screenshots ---
   takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
@@ -43,6 +44,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // --- Audio ---
   startRealtimeRecording: (includeSystemAudio: boolean = true) => ipcRenderer.invoke("start-realtime-recording", includeSystemAudio),
   stopRealtimeRecording: () => ipcRenderer.invoke("stop-realtime-recording"),
+  startRecording: () => ipcRenderer.invoke("start-realtime-recording", true),
+  stopRecording: () => ipcRenderer.invoke("stop-realtime-recording"),
   isRecording: () => ipcRenderer.invoke("is-recording"),
   clearSpeechTranscript: () => ipcRenderer.invoke("clear-speech-transcript"),
   analyzeAudioChunk: (args: { base64Data: string; mimeType: string }) => ipcRenderer.invoke("analyze-audio-chunk", args),
@@ -59,6 +62,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // --- Screen Analysis ---
   analyzeScreenAutomatically: (imagePath: string) => ipcRenderer.invoke("analyze-screen-automatically", imagePath),
   analyzeScreenWithPrompt: (imagePath: string, prompt: string) => ipcRenderer.invoke("analyze-screen-with-prompt", imagePath, prompt),
+  analyzeCurrentScreen: () => ipcRenderer.invoke("analyze-current-screen"),
 
   // --- Event Listeners ---
   onScreenshotTaken: (callback: (path: string) => void) => {

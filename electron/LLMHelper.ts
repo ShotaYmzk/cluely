@@ -54,7 +54,7 @@ export class LLMHelper {
 }\n\n重要：\n- 問題文が明確な場合は、その問題に対する具体的な回答を必ず提供してください\n- 「自分で考えましょう」のような一般的なアドバイスは避けてください\n- 選択肢がある場合は、正しい選択肢を選んで回答してください\n- 数学問題の場合は、計算過程を含めて具体的な答えを提供してください\n- プログラミング問題の場合は、実際のコードを提供してください\n- クイズやテスト問題の場合は、正しい答えを直接示してください\n- 回答が複数ある場合は、最も適切な回答を選んでください\n- JSONオブジェクトのみを返してください。マークダウン形式やコードブロックは含めないでください。`;
 
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite-preview-06-17",
         contents: [prompt, ...imageParts]
       });
       

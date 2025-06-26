@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [streamingContent, setStreamingContent] = useState("")
   const [isInputExpanded, setIsInputExpanded] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [isListening, setIsListening] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -59,14 +60,12 @@ const App: React.FC = () => {
 
       // Command+Enter での分析プロンプト表示時に入力画面を展開
       window.electronAPI.onShowAnalysisPrompt ? window.electronAPI.onShowAnalysisPrompt(() => {
-        if (!isInputExpanded) {
-          setIsInputExpanded(true)
-          setTimeout(() => {
-            if (inputRef.current) {
-              inputRef.current.focus()
-            }
-          }, 100)
-        }
+        setIsInputExpanded(true)
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus()
+          }
+        }, 100)
       }) : (() => {}),
 
       // アプリ表示時に最小状態に
@@ -76,14 +75,21 @@ const App: React.FC = () => {
     ]
 
     return () => cleanupFunctions.filter(Boolean).forEach(cleanup => cleanup?.())
-  }, [isInputExpanded, inputValue])
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const trimmedInput = inputValue.trim()
-    if (!trimmedInput || isStreaming) return
+    
+    if (isStreaming) return
 
-    // ユーザーメッセージを追加
+    // テキストがない場合は画面分析のみ実行
+    if (!trimmedInput) {
+      await handleScreenAnalysis()
+      return
+    }
+
+    // テキストがある場合は従来の処理
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
@@ -97,8 +103,8 @@ const App: React.FC = () => {
     setStreamingContent("")
 
     try {
-      // AIにメッセージを送信（仮実装 - 実際のAPI呼び出しに置き換え）
-      const response = await simulateAIResponse(trimmedInput)
+      // 画面+テキストプロンプトをLLMに送信
+      const response = await handleScreenAnalysisWithPrompt(trimmedInput)
       
       // ストリーミング効果
       let index = 0
@@ -145,19 +151,72 @@ const App: React.FC = () => {
     }
   }
 
-  // 仮のAI応答シミュレーション（実際のAPI呼び出しに置き換え）
-  const simulateAIResponse = async (input: string): Promise<string> => {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    if (input.toLowerCase().includes("hello") || input.toLowerCase().includes("こんにちは")) {
-      return "こんにちは！何かお手伝いできることはありますか？"
+  // 画面分析のみの処理
+  const handleScreenAnalysis = async () => {
+    setIsStreaming(true)
+    setStreamingContent("")
+
+    try {
+      // スクリーンショット撮影 + 音声（リスニング中の場合）をLLMに送信
+      const response = await window.electronAPI?.analyzeCurrentScreen()
+      
+      // ストリーミング効果
+      let index = 0
+      const streamInterval = setInterval(() => {
+        setStreamingContent(response.slice(0, index))
+        index += Math.floor(Math.random() * 3) + 1
+        
+        if (index >= response.length) {
+          setStreamingContent(response)
+          clearInterval(streamInterval)
+          
+          const assistantMessage: Message = {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: response,
+            timestamp: Date.now()
+          }
+          
+          setMessages(prev => [...prev, assistantMessage])
+          setStreamingContent("")
+          setIsStreaming(false)
+          
+          if (inputRef.current) {
+            inputRef.current.focus()
+          }
+        }
+      }, 30)
+
+    } catch (error) {
+      console.error("画面分析エラー:", error)
+      setIsStreaming(false)
+      setStreamingContent("")
+      
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        type: 'assistant',
+        content: "画面分析中にエラーが発生しました。",
+        timestamp: Date.now()
+      }
+      
+      setMessages(prev => [...prev, errorMessage])
     }
-    
-    if (input.toLowerCase().includes("code") || input.toLowerCase().includes("コード")) {
-      return `コードについて質問いただきありがとうございます。\n\n例えば、以下のようなJavaScriptコードがあります：\n\n\`\`\`javascript\nfunction greet(name) {\n  return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));\n\`\`\`\n\nこのコードは引数として渡された名前を使って挨拶メッセージを生成します。何か特定のコードについて質問がありますか？`
+  }
+
+  // 画面分析+テキストプロンプトの処理
+  const handleScreenAnalysisWithPrompt = async (prompt: string): Promise<string> => {
+    try {
+      // スクリーンショットを撮って、プロンプトと一緒に分析
+      const screenshotResult = await window.electronAPI?.takeScreenshot()
+      if (screenshotResult?.success && screenshotResult.path) {
+        const response = await window.electronAPI?.analyzeScreenWithPrompt(screenshotResult.path, prompt)
+        return response?.text || "分析結果を取得できませんでした。"
+      } else {
+        throw new Error("スクリーンショットの撮影に失敗しました。")
+      }
+    } catch (error) {
+      throw error
     }
-    
-    return `「${input}」について回答します。\n\nこれは画面のコンテキストを理解して、リアルタイムで応答するAIアシスタントのデモです。\n\n**特徴：**\n- ミニマルなデザイン\n- 即座の応答\n- ストリーミング表示\n- キーボードショートカット対応\n\n何か他にご質問はありますか？`
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -171,6 +230,69 @@ const App: React.FC = () => {
     }
   }
 
+  // 機能ボタンのハンドラー
+  const handleListenToggle = async () => {
+    try {
+      if (isListening) {
+        const result = await window.electronAPI?.stopRecording()
+        if (result?.success) {
+          setIsListening(false)
+        }
+      } else {
+        const result = await window.electronAPI?.startRecording()
+        if (result?.success) {
+          setIsListening(true)
+        }
+      }
+    } catch (error) {
+      console.error("音声録音エラー:", error)
+    }
+  }
+
+  const handleAskPrompt = () => {
+    setIsInputExpanded(true)
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus()
+      }
+    }, 100)
+  }
+
+  const handleShowHide = () => {
+    window.electronAPI?.toggleWindow()
+  }
+
+  // 録音状態の監視
+  useEffect(() => {
+    if (!window.electronAPI) return
+
+    const checkRecordingStatus = async () => {
+      try {
+        const result = await window.electronAPI.isRecording()
+        setIsListening(result?.isRecording || false)
+      } catch (error) {
+        console.error("録音状態の確認エラー:", error)
+      }
+    }
+
+    // 初期状態を確認
+    checkRecordingStatus()
+
+    // 録音状態の変更をリッスン
+    const cleanupRecordingStarted = window.electronAPI.onSpeechRecordingStarted?.(() => {
+      setIsListening(true)
+    })
+
+    const cleanupRecordingStopped = window.electronAPI.onSpeechRecordingStopped?.(() => {
+      setIsListening(false)
+    })
+
+    return () => {
+      cleanupRecordingStarted?.()
+      cleanupRecordingStopped?.()
+    }
+  }, [])
+
   // メインコンテンツが表示されているかどうか
   const hasContent = messages.length > 0 || isStreaming || isInputExpanded
 
@@ -179,20 +301,47 @@ const App: React.FC = () => {
       ref={containerRef}
       className={`transition-all duration-300 ease-in-out ${
         hasContent 
-          ? "min-h-0 max-w-2xl mx-auto bg-black/20 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl" 
+          ? "min-h-0 max-w-lg mx-auto bg-black/20 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl" 
           : "w-auto mx-auto"
       }`}
       style={{ cursor: 'default' }}
     >
       {!hasContent ? (
         // ミニマル表示状態
-        <div className="flex items-center gap-2 px-3 py-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg">
-          <span className="text-white/80 text-sm font-medium">listen</span>
-          <span className="text-white/60 text-sm">ask⌘+↩︎</span>
-          <span className="text-white/60 text-sm">show/hide ⌘+B</span>
+        <div 
+          className="flex items-center justify-center gap-2 px-2 py-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg"
+          style={{ minWidth: '280px', maxWidth: '320px' }}
+        >
+          <button
+            onClick={handleListenToggle}
+            className={`text-sm font-medium transition-colors ${
+              isListening ? 'text-green-400' : 'text-white/80 hover:text-white'
+            }`}
+            style={{ cursor: 'default' }}
+          >
+            {isListening ? 'listening' : 'listen'}
+          </button>
+          
+          <button
+            onClick={handleAskPrompt}
+            className="text-white/60 hover:text-white text-sm transition-colors"
+            style={{ cursor: 'default' }}
+          >
+            ask⌘+↩︎
+          </button>
+          
+          <button
+            onClick={handleShowHide}
+            className="text-white/60 hover:text-white text-sm transition-colors"
+            style={{ cursor: 'default' }}
+          >
+            show/hide ⌘+B
+          </button>
+          
           <button 
             onClick={() => setShowHelp(!showHelp)}
-            className="text-white/60 hover:text-white/80 text-sm transition-colors ml-1"
+            className="text-white/60 hover:text-white/80 text-sm transition-colors"
+            style={{ cursor: 'default' }}
           >
             ...
           </button>
@@ -204,8 +353,6 @@ const App: React.FC = () => {
                 <div><span className="text-white/60">Command + Enter:</span> 画面分析（音声録音中なら音声+画面分析）</div>
                 <div><span className="text-white/60">Command + R:</span> 音声録音の開始/停止</div>
                 <div><span className="text-white/60">Command + H:</span> スクリーンショット撮影</div>
-                <div><span className="text-white/60">Command + Down:</span> チャット下スクロール</div>
-                <div><span className="text-white/60">Command + Up:</span> チャット上スクロール</div>
                 <div><span className="text-white/60">Shift + Enter:</span> 改行</div>
               </div>
             </div>
@@ -214,7 +361,7 @@ const App: React.FC = () => {
       ) : (
         // 展開表示状態
         <>
-          {/* メッセージエリア */}
+          {/* メッセージエリア - 入力画面のみの場合は非表示 */}
           {(messages.length > 0 || isStreaming) && (
             <div className="px-4 py-3 max-h-96 overflow-y-auto border-b border-white/10">
               {messages.map((message) => (
@@ -260,18 +407,18 @@ const App: React.FC = () => {
 
           {/* 入力エリア */}
           {isInputExpanded && (
-            <div className="p-4 bg-gradient-to-r from-white/5 to-white/10 rounded-b-xl">
+            <div className="p-4">
               <form onSubmit={handleSubmit} className="space-y-3">
                 <textarea
                   ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="画面について質問する..."
+                  placeholder="画面について質問する（空白のままEnterで画面分析のみ実行）..."
                   disabled={isStreaming}
                   rows={3}
                   className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent disabled:opacity-50 resize-none"
-                  style={{ cursor: 'default' }}
+                  style={{ cursor: 'text' }}
                 />
                 <div className="flex justify-between items-center">
                   <button
@@ -281,19 +428,20 @@ const App: React.FC = () => {
                       setInputValue("")
                     }}
                     className="px-3 py-1 text-xs text-white/60 hover:text-white/80 transition-colors"
+                    style={{ cursor: 'default' }}
                   >
                     ESC: 閉じる
                   </button>
                   <button
                     type="submit"
-                    disabled={!inputValue.trim() || isStreaming}
+                    disabled={isStreaming}
                     className="px-4 py-2 bg-blue-600/80 hover:bg-blue-600/90 disabled:bg-white/10 disabled:text-white/30 text-white rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
                     style={{ cursor: 'default' }}
                   >
                     {isStreaming ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      "送信"
+                      inputValue.trim() ? "分析" : "画面分析"
                     )}
                   </button>
                 </div>
@@ -306,6 +454,7 @@ const App: React.FC = () => {
             <button 
               onClick={() => setShowHelp(!showHelp)}
               className="text-white/40 hover:text-white/60 text-xs transition-colors"
+              style={{ cursor: 'default' }}
             >
               ...
             </button>
@@ -316,8 +465,6 @@ const App: React.FC = () => {
                   <div><span className="text-white/60">Command + Enter:</span> 画面分析（音声録音中なら音声+画面分析）</div>
                   <div><span className="text-white/60">Command + R:</span> 音声録音の開始/停止</div>
                   <div><span className="text-white/60">Command + H:</span> スクリーンショット撮影</div>
-                  <div><span className="text-white/60">Command + Down:</span> チャット下スクロール</div>
-                  <div><span className="text-white/60">Command + Up:</span> チャット上スクロール</div>
                   <div><span className="text-white/60">Shift + Enter:</span> 改行</div>
                 </div>
               </div>

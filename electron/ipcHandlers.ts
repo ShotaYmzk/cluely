@@ -161,6 +161,40 @@ export function initializeIpcHandlers(appState: AppState) {
     }
   })
 
+  // **現在の画面を自動分析**
+  ipcMain.handle("analyze-current-screen", async () => {
+    try {
+      // スクリーンショット撮影
+      const screenshotPath = await appState.takeScreenshot()
+      
+      // 音声が録音中の場合、音声も含めて分析
+      let prompt = "画面の内容を詳しく分析してください。"
+      if (appState.isRecording()) {
+        prompt += " 現在音声も録音中です。画面の情報と合わせて総合的に分析してください。"
+      }
+      
+      // 画面分析実行
+      const result = await appState.analyzeScreenWithPrompt(screenshotPath, prompt)
+      return result.text || "分析結果を取得できませんでした。"
+    } catch (error: any) {
+      console.error("Error in analyze-current-screen handler:", error)
+      return "画面分析中にエラーが発生しました。"
+    }
+  })
+
+  // **ウィンドウ表示/非表示切り替え**
+  ipcMain.handle("toggle-window", () => {
+    try {
+      if (appState.isVisible()) {
+        appState.hideMainWindow()
+      } else {
+        appState.showMainWindow()
+      }
+    } catch (error: any) {
+      console.error("Error toggling window:", error)
+    }
+  })
+
   // IPC handler for processing action responses
   ipcMain.handle("process-action-response", async (event, action: string) => {
     try {
