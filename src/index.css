@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* カーソルを全体で固定 */
+* {
+    cursor: default !important;
+  }
+  
+  /* または、より具体的に */
+  *, *:hover, *:active, *:focus {
+    cursor: default !important;
+  }

@@ -22,11 +22,11 @@ function App() {
     
     try {
       // 既存のElectron IPC経由でスクリーンショット取得
-      const screenshotPath = await (window as any).electronAPI?.invoke('take-screenshot')
+      const screenshotResult = await (window as any).electronAPI?.takeScreenshot()
       
-      if (screenshotPath) {
+      if (screenshotResult && screenshotResult.success && screenshotResult.path) {
         // 音声入力とスクリーンショットを組み合わせてAI処理
-        const response = await processVoiceAndScreenshot(voiceText, screenshotPath)
+        const response = await processVoiceAndScreenshot(voiceText, screenshotResult.path)
         setAiResponse(response)
       } else {
         // スクリーンショットなしで音声のみ処理

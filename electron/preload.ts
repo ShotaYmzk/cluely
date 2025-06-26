@@ -66,6 +66,31 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("screenshot-taken", handler);
     return () => ipcRenderer.removeListener("screenshot-taken", handler);
   },
+  onScreenshotError: (callback: (error: string) => void) => {
+    const handler = (_: any, error: string) => callback(error);
+    ipcRenderer.on("screenshot-error", handler);
+    return () => ipcRenderer.removeListener("screenshot-error", handler);
+  },
+  onProblemExtracted: (callback: (data: any) => void) => {
+    const handler = (_: any, data: any) => callback(data);
+    ipcRenderer.on(PROCESSING_EVENTS.PROBLEM_EXTRACTED, handler);
+    return () => ipcRenderer.removeListener(PROCESSING_EVENTS.PROBLEM_EXTRACTED, handler);
+  },
+  onSolutionSuccess: (callback: (data: any) => void) => {
+    const handler = (_: any, data: any) => callback(data);
+    ipcRenderer.on(PROCESSING_EVENTS.SOLUTION_SUCCESS, handler);
+    return () => ipcRenderer.removeListener(PROCESSING_EVENTS.SOLUTION_SUCCESS, handler);
+  },
+  onActionResponseGenerated: (callback: (data: any) => void) => {
+    const handler = (_: any, data: any) => callback(data);
+    ipcRenderer.on(PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, handler);
+    return () => ipcRenderer.removeListener(PROCESSING_EVENTS.ACTION_RESPONSE_GENERATED, handler);
+  },
+  onActionResponseError: (callback: (error: string) => void) => {
+    const handler = (_: any, error: string) => callback(error);
+    ipcRenderer.on(PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, handler);
+    return () => ipcRenderer.removeListener(PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, handler);
+  },
   onResetView: (callback: () => void) => {
     ipcRenderer.on("reset-view", callback);
     return () => ipcRenderer.removeListener("reset-view", callback);

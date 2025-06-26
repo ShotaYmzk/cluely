@@ -88,11 +88,11 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
       // 必要に応じてスクリーンショット撮影
       if (autoCapture) {
         const result = await window.electronAPI.takeScreenshot()
-        if (result && result.path) {
+        if (result && result.success && result.path) {
           screenshotPath = result.path
           refetch() // スクリーンショット一覧を更新
         } else {
-          throw new Error("スクリーンショットの撮影に失敗しました")
+          throw new Error(result?.error || "スクリーンショットの撮影に失敗しました")
         }
       } else if (screenshots.length > 0) {
         // 最新のスクリーンショットを使用
@@ -111,7 +111,11 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
         analysisResult = await window.electronAPI.analyzeScreenAutomatically(screenshotPath)
       }
 
-      setAnalysisResult(analysisResult.text || analysisResult.error || "分析結果を取得できませんでした")
+      if (analysisResult && analysisResult.success) {
+        setAnalysisResult(analysisResult.text || "分析結果を取得できませんでした")
+      } else {
+        throw new Error(analysisResult?.error || "画面分析に失敗しました")
+      }
       setShowAnalysisDialog(false)
       showToast("分析完了", "画面分析が完了しました", "success")
 

@@ -162,6 +162,7 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
         setIsProcessing(true)
       }),
       window.electronAPI.onDebugError((error: string) => {
+        console.error("Debug error:", error)
         showToast("処理失敗", "コードのデバッグ中にエラーが発生しました。", "error")
         setIsProcessing(false)
       })
