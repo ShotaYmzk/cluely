@@ -227,7 +227,10 @@ class WindowHelper {
     this.step = Math.floor(this.screenWidth / 10);
     this.currentX = 0;
     this.mainWindow = new electron.BrowserWindow({
-      height: 600,
+      width: 300,
+      height: 50,
+      minWidth: 250,
+      minHeight: 40,
       x: this.currentX,
       y: 0,
       webPreferences: {
@@ -245,7 +248,8 @@ class WindowHelper {
       backgroundColor: "#00000000",
       focusable: true,
       movable: true,
-      skipTaskbar: true
+      skipTaskbar: true,
+      resizable: true
     });
     if (isDev) {
       this.mainWindow.webContents.openDevTools({ mode: "detach" });
@@ -4215,7 +4219,7 @@ class ShortcutsHelper {
     try {
       electron.globalShortcut.unregisterAll();
       this.registeredShortcuts = [];
-      const toggleShortcut = "CommandOrControl+Space";
+      const toggleShortcut = "CommandOrControl+B";
       try {
         electron.globalShortcut.register(toggleShortcut, () => {
           console.log(`${toggleShortcut} pressed - toggling window`);
@@ -4428,7 +4432,7 @@ class ShortcutsHelper {
    */
   getShortcutHelp() {
     return {
-      "CommandOrControl+Space": "ウィンドウの表示/非表示切り替え",
+      "CommandOrControl+B": "ウィンドウの表示/非表示切り替え",
       "CommandOrControl+H": "スクリーンショット撮影",
       "CommandOrControl+Return": "分析プロンプト表示（スクリーンショット分析）",
       "CommandOrControl+Shift+Return": "クイック問題解決（自動スクリーンショット + 分析）",

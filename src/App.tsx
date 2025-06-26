@@ -14,8 +14,10 @@ const App: React.FC = () => {
   const [inputValue, setInputValue] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState("")
+  const [isInputExpanded, setIsInputExpanded] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // 自動サイズ調整
@@ -34,7 +36,7 @@ const App: React.FC = () => {
     updateDimensions()
 
     return () => resizeObserver.disconnect()
-  }, [messages, streamingContent])
+  }, [messages, streamingContent, isInputExpanded])
 
   // メッセージを最下部にスクロール
   useEffect(() => {
@@ -52,33 +54,29 @@ const App: React.FC = () => {
         setMessages([])
         setStreamingContent("")
         setIsStreaming(false)
-        if (inputRef.current) {
-          inputRef.current.focus()
-        }
+        setIsInputExpanded(false)
       }),
 
-      // アプリ表示時に入力フィールドにフォーカス
+      // Command+Enter での分析プロンプト表示時に入力画面を展開
+      window.electronAPI.onShowAnalysisPrompt ? window.electronAPI.onShowAnalysisPrompt(() => {
+        if (!isInputExpanded) {
+          setIsInputExpanded(true)
+          setTimeout(() => {
+            if (inputRef.current) {
+              inputRef.current.focus()
+            }
+          }, 100)
+        }
+      }) : (() => {}),
+
+      // アプリ表示時に最小状態に
       ...(window.electronAPI.onShow ? [window.electronAPI.onShow(() => {
-        setTimeout(() => {
-          if (inputRef.current) {
-            inputRef.current.focus()
-          }
-        }, 100)
+        // アプリ表示時は最小状態から開始
       })] : [])
     ]
 
-    return () => cleanupFunctions.forEach(cleanup => cleanup())
-  }, [])
-
-  // アプリ起動時に入力フィールドにフォーカス
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus()
-      }
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [])
+    return () => cleanupFunctions.filter(Boolean).forEach(cleanup => cleanup?.())
+  }, [isInputExpanded, inputValue])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -167,111 +165,166 @@ const App: React.FC = () => {
       e.preventDefault()
       handleSubmit(e as any)
     }
+    if (e.key === 'Escape') {
+      setIsInputExpanded(false)
+      setInputValue("")
+    }
   }
+
+  // メインコンテンツが表示されているかどうか
+  const hasContent = messages.length > 0 || isStreaming || isInputExpanded
 
   return (
     <div 
       ref={containerRef}
-      className="min-h-0 max-w-2xl mx-auto bg-black/20 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl"
+      className={`transition-all duration-300 ease-in-out ${
+        hasContent 
+          ? "min-h-0 max-w-2xl mx-auto bg-black/20 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl" 
+          : "w-auto mx-auto"
+      }`}
       style={{ cursor: 'default' }}
     >
-      {/* ヘッダー - ドラッグ可能エリア */}
-      <div className="p-4 border-b border-white/10 bg-gradient-to-r from-white/5 to-white/10 rounded-t-xl">
-        <div className="flex items-center justify-between">
-          <div className="text-white/90 font-medium text-sm">
-            AI Assistant
-          </div>
-          <div className="text-xs text-white/50">
-            ⌘+B: 表示切替 | ⌘+R: 履歴クリア
-          </div>
-        </div>
-      </div>
-
-      {/* メッセージエリア */}
-      <div className="px-4 py-3 max-h-96 overflow-y-auto">
-        {messages.length === 0 && !isStreaming && (
-          <div className="text-center py-8">
-            <div className="text-white/60 text-sm mb-2">
-              画面について質問してください
-            </div>
-            <div className="text-white/40 text-xs">
-              Command + Enterで送信
-            </div>
-          </div>
-        )}
-
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`mb-4 ${message.type === 'user' ? 'text-right' : 'text-left'}`}
+      {!hasContent ? (
+        // ミニマル表示状態
+        <div className="flex items-center gap-2 px-3 py-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg">
+          <span className="text-white/80 text-sm font-medium">listen</span>
+          <span className="text-white/60 text-sm">ask⌘+↩︎</span>
+          <span className="text-white/60 text-sm">show/hide ⌘+B</span>
+          <button 
+            onClick={() => setShowHelp(!showHelp)}
+            className="text-white/60 hover:text-white/80 text-sm transition-colors ml-1"
           >
-            <div
-              className={`inline-block max-w-[80%] p-3 rounded-lg text-sm ${
-                message.type === 'user'
-                  ? 'bg-blue-600/80 text-white ml-auto'
-                  : 'bg-white/10 text-white/90 mr-auto'
-              }`}
-            >
-              {message.type === 'assistant' ? (
-                <MarkdownRenderer 
-                  content={message.content} 
-                  className="text-sm leading-relaxed"
-                />
-              ) : (
-                <div className="whitespace-pre-wrap">{message.content}</div>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {/* ストリーミング中のメッセージ */}
-        {isStreaming && (
-          <div className="mb-4 text-left">
-            <div className="inline-block max-w-[80%] p-3 rounded-lg text-sm bg-white/10 text-white/90 mr-auto">
-              <MarkdownRenderer 
-                content={streamingContent} 
-                className="text-sm leading-relaxed"
-              />
-              <span className="inline-block w-2 h-4 bg-white/60 ml-1 animate-pulse" />
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* 入力エリア */}
-      <div className="p-4 border-t border-white/10 bg-gradient-to-r from-white/5 to-white/10 rounded-b-xl">
-        <form onSubmit={handleSubmit} className="flex gap-3">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="画面について質問する..."
-            disabled={isStreaming}
-            className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent disabled:opacity-50"
-            style={{ cursor: 'default' }}
-          />
-          <button
-            type="submit"
-            disabled={!inputValue.trim() || isStreaming}
-            className="px-4 py-2 bg-blue-600/80 hover:bg-blue-600/90 disabled:bg-white/10 disabled:text-white/30 text-white rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
-            style={{ cursor: 'default' }}
-          >
-            {isStreaming ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              "送信"
-            )}
+            ...
           </button>
-        </form>
-        
-        <div className="mt-2 text-xs text-white/40 text-center">
-          Enter: 送信 | Shift+Enter: 改行
+          
+          {showHelp && (
+            <div className="absolute top-full left-0 mt-2 p-3 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 shadow-xl z-50 text-xs text-white/80 whitespace-nowrap">
+              <div className="space-y-1">
+                <div><span className="text-white/60">Command + B:</span> アプリの表示/非表示切り替え</div>
+                <div><span className="text-white/60">Command + Enter:</span> 画面分析（音声録音中なら音声+画面分析）</div>
+                <div><span className="text-white/60">Command + R:</span> 音声録音の開始/停止</div>
+                <div><span className="text-white/60">Command + H:</span> スクリーンショット撮影</div>
+                <div><span className="text-white/60">Command + Down:</span> チャット下スクロール</div>
+                <div><span className="text-white/60">Command + Up:</span> チャット上スクロール</div>
+                <div><span className="text-white/60">Shift + Enter:</span> 改行</div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      ) : (
+        // 展開表示状態
+        <>
+          {/* メッセージエリア */}
+          {(messages.length > 0 || isStreaming) && (
+            <div className="px-4 py-3 max-h-96 overflow-y-auto border-b border-white/10">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`mb-4 ${message.type === 'user' ? 'text-right' : 'text-left'}`}
+                >
+                  <div
+                    className={`inline-block max-w-[80%] p-3 rounded-lg text-sm ${
+                      message.type === 'user'
+                        ? 'bg-blue-600/80 text-white ml-auto'
+                        : 'bg-white/10 text-white/90 mr-auto'
+                    }`}
+                  >
+                    {message.type === 'assistant' ? (
+                      <MarkdownRenderer 
+                        content={message.content} 
+                        className="text-sm leading-relaxed"
+                      />
+                    ) : (
+                      <div className="whitespace-pre-wrap">{message.content}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* ストリーミング中のメッセージ */}
+              {isStreaming && (
+                <div className="mb-4 text-left">
+                  <div className="inline-block max-w-[80%] p-3 rounded-lg text-sm bg-white/10 text-white/90 mr-auto">
+                    <MarkdownRenderer 
+                      content={streamingContent} 
+                      className="text-sm leading-relaxed"
+                    />
+                    <span className="inline-block w-2 h-4 bg-white/60 ml-1 animate-pulse" />
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+
+          {/* 入力エリア */}
+          {isInputExpanded && (
+            <div className="p-4 bg-gradient-to-r from-white/5 to-white/10 rounded-b-xl">
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <textarea
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="画面について質問する..."
+                  disabled={isStreaming}
+                  rows={3}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent disabled:opacity-50 resize-none"
+                  style={{ cursor: 'default' }}
+                />
+                <div className="flex justify-between items-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsInputExpanded(false)
+                      setInputValue("")
+                    }}
+                    className="px-3 py-1 text-xs text-white/60 hover:text-white/80 transition-colors"
+                  >
+                    ESC: 閉じる
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!inputValue.trim() || isStreaming}
+                    className="px-4 py-2 bg-blue-600/80 hover:bg-blue-600/90 disabled:bg-white/10 disabled:text-white/30 text-white rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                    style={{ cursor: 'default' }}
+                  >
+                    {isStreaming ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      "送信"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ミニマルヘッダー */}
+          <div className="absolute top-2 right-2 flex items-center gap-2">
+            <button 
+              onClick={() => setShowHelp(!showHelp)}
+              className="text-white/40 hover:text-white/60 text-xs transition-colors"
+            >
+              ...
+            </button>
+            {showHelp && (
+              <div className="absolute top-full right-0 mt-2 p-3 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 shadow-xl z-50 text-xs text-white/80 whitespace-nowrap">
+                <div className="space-y-1">
+                  <div><span className="text-white/60">Command + B:</span> アプリの表示/非表示切り替え</div>
+                  <div><span className="text-white/60">Command + Enter:</span> 画面分析（音声録音中なら音声+画面分析）</div>
+                  <div><span className="text-white/60">Command + R:</span> 音声録音の開始/停止</div>
+                  <div><span className="text-white/60">Command + H:</span> スクリーンショット撮影</div>
+                  <div><span className="text-white/60">Command + Down:</span> チャット下スクロール</div>
+                  <div><span className="text-white/60">Command + Up:</span> チャット上スクロール</div>
+                  <div><span className="text-white/60">Shift + Enter:</span> 改行</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

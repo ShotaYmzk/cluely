@@ -58,7 +58,10 @@ class WindowHelper {
         this.step = Math.floor(this.screenWidth / 10);
         this.currentX = 0;
         this.mainWindow = new electron_1.BrowserWindow({
-            height: 600,
+            width: 300,
+            height: 50,
+            minWidth: 250,
+            minHeight: 40,
             x: this.currentX,
             y: 0,
             webPreferences: {
@@ -77,6 +80,7 @@ class WindowHelper {
             focusable: true,
             movable: true,
             skipTaskbar: true,
+            resizable: true,
         });
         if (isDev) {
             this.mainWindow.webContents.openDevTools({ mode: 'detach' });

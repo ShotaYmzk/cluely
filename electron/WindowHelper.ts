@@ -66,7 +66,10 @@ export class WindowHelper {
     this.currentX = 0
 
     this.mainWindow = new BrowserWindow({
-      height: 600,
+      width: 300,
+      height: 50,
+      minWidth: 250,
+      minHeight: 40,
       x: this.currentX,
       y: 0,
       webPreferences: {
@@ -85,6 +88,7 @@ export class WindowHelper {
       focusable: true,
       movable: true,
       skipTaskbar: true,
+      resizable: true,
     })
 
     if (isDev) {

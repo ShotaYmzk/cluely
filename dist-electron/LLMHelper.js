@@ -4,10 +4,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LLMHelper = void 0;
-const generative_ai_1 = require("@google/generative-ai");
+// electron/LLMHelper.ts
+const genai_1 = require("@google/genai");
 const fs_1 = __importDefault(require("fs"));
 class LLMHelper {
-    model;
+    ai;
     systemPrompt = `あなたはWingman AIです。どんな問題や状況（コーディングに限らず）でも役立つ、積極的なアシスタントです。ユーザーの入力に対して、状況を分析し、明確な問題文、関連するコンテキストを理解し、具体的な回答や解決策を直接提供してください。
 
 **重要な指示**:
@@ -23,8 +24,8 @@ class LLMHelper {
 
 **重要**: 回答は必ずMarkdown形式で提供してください。見出し、リスト、強調、コードブロックなどを適切に使用して、読みやすく構造化された回答を作成してください。`;
     constructor(apiKey) {
-        const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
-        this.model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-06-17" }); //gemini-2.0-flash
+        // ★★★ エラーの原因だった箇所 ★★★
+        this.ai = new genai_1.GoogleGenAI({ apiKey });
     }
     async fileToGenerativePart(imagePath) {
         const imageData = await fs_1.default.promises.readFile(imagePath);
@@ -36,9 +37,7 @@ class LLMHelper {
         };
     }
     cleanJsonResponse(text) {
-        // Remove markdown code block syntax if present
         text = text.replace(/^```(?:json)?\n/, '').replace(/\n```$/, '');
-        // Remove any leading/trailing whitespace
         text = text.trim();
         return text;
     }
@@ -53,9 +52,11 @@ class LLMHelper {
   "suggested_responses": ["具体的な次のステップやアクション1", "具体的な次のステップやアクション2", "..."],
   "reasoning": "これらの提案が適切である理由の説明"
 }\n\n重要：\n- 問題文が明確な場合は、その問題に対する具体的な回答を必ず提供してください\n- 「自分で考えましょう」のような一般的なアドバイスは避けてください\n- 選択肢がある場合は、正しい選択肢を選んで回答してください\n- 数学問題の場合は、計算過程を含めて具体的な答えを提供してください\n- プログラミング問題の場合は、実際のコードを提供してください\n- クイズやテスト問題の場合は、正しい答えを直接示してください\n- 回答が複数ある場合は、最も適切な回答を選んでください\n- JSONオブジェクトのみを返してください。マークダウン形式やコードブロックは含めないでください。`;
-            const result = await this.model.generateContent([prompt, ...imageParts]);
-            const response = await result.response;
-            const text = response.text();
+            const response = await this.ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: [prompt, ...imageParts]
+            });
+            const text = response.text;
             const cleanedText = this.cleanJsonResponse(text);
             try {
                 const jsonResponse = JSON.parse(cleanedText);
@@ -80,9 +81,11 @@ class LLMHelper {
                 }
             };
             const prompt = `${this.systemPrompt}\n\nこの音声クリップを短く簡潔に説明してください。メインの回答に加えて、音声に基づいてユーザーが次に取れる可能性のある複数の具体的なアクションや回答を提案してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答し、簡潔にしてください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
-            const result = await this.model.generateContent([prompt, audioPart]);
-            const response = await result.response;
-            const text = response.text();
+            const response = await this.ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: [prompt, audioPart]
+            });
+            const text = response.text;
             return { text, timestamp: Date.now() };
         }
         catch (error) {
@@ -100,9 +103,11 @@ class LLMHelper {
                 }
             };
             const prompt = `${this.systemPrompt}\n\nこの画像の内容を短く簡潔に説明してください。メインの回答に加えて、画像に基づいてユーザーが次に取れる可能性のある複数の具体的なアクションや回答を提案してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答してください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
-            const result = await this.model.generateContent([prompt, imagePart]);
-            const response = await result.response;
-            const text = response.text();
+            const response = await this.ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: [prompt, imagePart]
+            });
+            const text = response.text;
             return { text, timestamp: Date.now() };
         }
         catch (error) {
@@ -116,13 +121,15 @@ class LLMHelper {
             const audioPart = {
                 inlineData: {
                     data: audioData.toString("base64"),
-                    mimeType: "audio/mp3"
+                    mimeType: `audio/${path.split('.').pop() || 'mp3'}`
                 }
             };
             const prompt = `${this.systemPrompt}\n\nこの音声ファイルを分析して内容を説明してください。メインの回答に加えて、音声の内容に基づいてユーザーが次に取れる可能性のある複数の具体的なアクションや回答を提案してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
-            const result = await this.model.generateContent([prompt, audioPart]);
-            const response = await result.response;
-            const text = response.text();
+            const response = await this.ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: [prompt, audioPart]
+            });
+            const text = response.text;
             return { text, timestamp: Date.now() };
         }
         catch (error) {
@@ -130,9 +137,6 @@ class LLMHelper {
             throw error;
         }
     }
-    /**
-     * **新規追加: スクリーンショットの自動分析（プロンプトなし）**
-     */
     async analyzeScreenAutomatically(imagePath) {
         try {
             const imageData = await fs_1.default.promises.readFile(imagePath);
@@ -159,9 +163,11 @@ class LLMHelper {
 - Markdown形式で見出し、リスト、強調を適切に使用してください
 
 画面の内容に基づいて、直接的で有用な分析と提案を提供してください。`;
-            const result = await this.model.generateContent([prompt, imagePart]);
-            const response = await result.response;
-            const text = response.text();
+            const response = await this.ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: [prompt, imagePart]
+            });
+            const text = response.text;
             return {
                 text,
                 timestamp: Date.now(),
@@ -174,9 +180,6 @@ class LLMHelper {
             throw error;
         }
     }
-    /**
-     * **新規追加: プロンプト付きスクリーンショット分析**
-     */
     async analyzeScreenWithPrompt(imagePath, userPrompt) {
         try {
             const imageData = await fs_1.default.promises.readFile(imagePath);
@@ -200,9 +203,11 @@ class LLMHelper {
 - Markdown形式で構造化された回答を作成してください
 
 画面の内容とユーザーの質問の両方を考慮して、最も有用な回答を提供してください。`;
-            const result = await this.model.generateContent([prompt, imagePart]);
-            const response = await result.response;
-            const text = response.text();
+            const response = await this.ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: [prompt, imagePart]
+            });
+            const text = response.text;
             return {
                 text,
                 timestamp: Date.now(),

@@ -13,8 +13,8 @@ class ShortcutsHelper {
             // Clear existing shortcuts first
             electron_1.globalShortcut.unregisterAll();
             this.registeredShortcuts = [];
-            // ウィンドウの表示/非表示切り替え - Cmd/Ctrl + Space
-            const toggleShortcut = "CommandOrControl+Space";
+            // ウィンドウの表示/非表示切り替え - Cmd/Ctrl + B
+            const toggleShortcut = "CommandOrControl+B";
             try {
                 electron_1.globalShortcut.register(toggleShortcut, () => {
                     console.log(`${toggleShortcut} pressed - toggling window`);
@@ -252,7 +252,7 @@ class ShortcutsHelper {
      */
     getShortcutHelp() {
         return {
-            "CommandOrControl+Space": "ウィンドウの表示/非表示切り替え",
+            "CommandOrControl+B": "ウィンドウの表示/非表示切り替え",
             "CommandOrControl+H": "スクリーンショット撮影",
             "CommandOrControl+Return": "分析プロンプト表示（スクリーンショット分析）",
             "CommandOrControl+Shift+Return": "クイック問題解決（自動スクリーンショット + 分析）",
