@@ -1,7 +1,7 @@
 // renderer/src/components/SimpleVoiceTest.tsx を一時的にテキスト入力版に変更
 // 音声の問題を回避して、まずは基本機能をテストします
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 
 interface VoiceTestProps {
   onVoiceInput?: (text: string) => void
@@ -12,6 +12,32 @@ export const SimpleVoiceTest: React.FC<VoiceTestProps> = ({ onVoiceInput }) => {
   const [debugInfo, setDebugInfo] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [testResults, setTestResults] = useState<string[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // command+enter で input にフォーカス
+  useEffect(() => {
+    console.log('🔧 ショートカットハンドラーを設定中...')
+    const handleKeyDown = (e: KeyboardEvent) => {
+      console.log('🔧 キー押下:', e.key, 'metaKey:', e.metaKey, 'ctrlKey:', e.ctrlKey)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        console.log('🔧 command+enter が検出されました！')
+        e.preventDefault()
+        if (inputRef.current) {
+          console.log('🔧 input要素にフォーカス中...')
+          inputRef.current.focus()
+          console.log('🔧 フォーカス完了')
+        } else {
+          console.log('❌ input要素が見つかりません')
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    console.log('🔧 ショートカットハンドラー設定完了')
+    return () => {
+      console.log('🔧 ショートカットハンドラーを削除中...')
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   // 🔧 ElectronAPI接続テスト
   const testElectronAPI = async () => {
@@ -161,6 +187,7 @@ export const SimpleVoiceTest: React.FC<VoiceTestProps> = ({ onVoiceInput }) => {
             placeholder="例: この問題の答えは何ですか？"
             className="flex-1 p-3 border border-gray-300 rounded-lg"
             onKeyPress={(e) => e.key === 'Enter' && testFullIntegration()}
+            ref={inputRef}
           />
           <button
             onClick={testFullIntegration}
@@ -173,6 +200,9 @@ export const SimpleVoiceTest: React.FC<VoiceTestProps> = ({ onVoiceInput }) => {
           >
             {isProcessing ? '🔄 処理中' : '🚀 実行'}
           </button>
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          💡 ショートカット: <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">⌘+Enter</kbd> でフォーカス
         </div>
       </div>
 
