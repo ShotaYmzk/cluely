@@ -53,6 +53,9 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   analyzeScreenAutomatically: (imagePath) => electron.ipcRenderer.invoke("analyze-screen-automatically", imagePath),
   analyzeScreenWithPrompt: (imagePath, prompt) => electron.ipcRenderer.invoke("analyze-screen-with-prompt", imagePath, prompt),
   analyzeCurrentScreen: () => electron.ipcRenderer.invoke("analyze-current-screen"),
+  // --- Thinking Mode ---
+  setThinkingMode: (enabled) => electron.ipcRenderer.invoke("set-thinking-mode", enabled),
+  getThinkingMode: () => electron.ipcRenderer.invoke("get-thinking-mode"),
   // --- Event Listeners ---
   onScreenshotTaken: (callback) => {
     const handler = (_, path) => callback(path);

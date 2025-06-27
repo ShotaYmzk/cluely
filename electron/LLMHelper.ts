@@ -4,6 +4,7 @@ import fs from "fs"
 
 export class LLMHelper {
   private ai: GoogleGenAI
+  private thinkingMode: boolean = true
   private readonly systemPrompt = `あなたはWingman AIです。どんな問題や状況（コーディングに限らず）でも役立つ、積極的なアシスタントです。ユーザーの入力に対して、状況を分析し、明確な問題文、関連するコンテキストを理解し、具体的な回答や解決策を直接提供してください。
 
 **重要な指示**:
@@ -22,6 +23,57 @@ export class LLMHelper {
   constructor(apiKey: string) {
     // ★★★ エラーの原因だった箇所 ★★★
     this.ai = new GoogleGenAI({ apiKey });
+  }
+
+  // Thinking modeの設定
+  public setThinkingMode(enabled: boolean) {
+    this.thinkingMode = enabled
+    console.log(`🧠 Thinking mode: ${enabled ? 'ON' : 'OFF'}`)
+  }
+
+  public getThinkingMode(): boolean {
+    return this.thinkingMode
+  }
+
+  // AI生成の共通設定を作成
+  private getGenerateContentConfig() {
+    const config: any = {
+      model: "gemini-2.5-flash-lite-preview-06-17"
+    }
+
+    if (this.thinkingMode) {
+      config.config = {
+        thinkingConfig: {
+          thinking_budget: -1, // 動的思考時間
+          include_thoughts: true // 思考過程を含める
+        }
+      }
+    }
+
+    return config
+  }
+
+  // レスポンスから思考過程と回答を分離
+  private extractThoughtsAndAnswer(response: any): { thoughts?: string, answer: string } {
+    if (!this.thinkingMode || !response.candidates?.[0]?.content?.parts) {
+      return { answer: response.text }
+    }
+
+    let thoughts = ''
+    let answer = ''
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.thought && part.text) {
+        thoughts += part.text + '\n\n'
+      } else if (part.text) {
+        answer += part.text
+      }
+    }
+
+    return {
+      thoughts: thoughts.trim() || undefined,
+      answer: answer.trim() || response.text
+    }
   }
 
   private async fileToGenerativePart(imagePath: string) {
@@ -53,12 +105,14 @@ export class LLMHelper {
   "reasoning": "これらの提案が適切である理由の説明"
 }\n\n重要：\n- 問題文が明確な場合は、その問題に対する具体的な回答を必ず提供してください\n- 「自分で考えましょう」のような一般的なアドバイスは避けてください\n- 選択肢がある場合は、正しい選択肢を選んで回答してください\n- 数学問題の場合は、計算過程を含めて具体的な答えを提供してください\n- プログラミング問題の場合は、実際のコードを提供してください\n- クイズやテスト問題の場合は、正しい答えを直接示してください\n- 回答が複数ある場合は、最も適切な回答を選んでください\n- JSONオブジェクトのみを返してください。マークダウン形式やコードブロックは含めないでください。`;
 
+      const config = this.getGenerateContentConfig()
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config,
         contents: [prompt, ...imageParts]
       });
       
-      const text = response.text;
+      const result = this.extractThoughtsAndAnswer(response)
+      const text = result.answer;
       
       const cleanedText = this.cleanJsonResponse(text);
       
@@ -84,12 +138,17 @@ export class LLMHelper {
         }
       };
       const prompt = `${this.systemPrompt}\n\nこの音声クリップを短く簡潔に説明してください。まず最初に要約や結論を短く簡潔に1～2文で示し、その後に詳細な説明や根拠、ユーザーが次に取れる具体的なアクションを順番に記載してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答し、簡潔にしてください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
+      const config = this.getGenerateContentConfig()
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config,
         contents: [prompt, audioPart]
       });
-      const text = response.text;
-      return { text, timestamp: Date.now() };
+      const result = this.extractThoughtsAndAnswer(response)
+      return { 
+        text: result.answer, 
+        thoughts: result.thoughts,
+        timestamp: Date.now() 
+      };
     } catch (error) {
       console.error("base64からの音声分析でエラーが発生しました:", error);
       throw error;
@@ -106,12 +165,17 @@ export class LLMHelper {
         }
       };
       const prompt = `${this.systemPrompt}\n\nこの画像の内容を短く簡潔に説明してください。まず最初に要約や結論を短く簡潔に1～2文で示し、その後に詳細な説明や根拠、ユーザーが次に取れる具体的なアクションを順番に記載してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答してください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
+      const config = this.getGenerateContentConfig()
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config,
         contents: [prompt, imagePart]
       });
-      const text = response.text;
-      return { text, timestamp: Date.now() };
+      const result = this.extractThoughtsAndAnswer(response)
+      return { 
+        text: result.answer, 
+        thoughts: result.thoughts,
+        timestamp: Date.now() 
+      };
     } catch (error) {
       console.error("画像ファイル分析でエラーが発生しました:", error);
       throw error;
@@ -128,12 +192,17 @@ export class LLMHelper {
         }
       };
       const prompt = `${this.systemPrompt}\n\nこの音声ファイルを分析して内容を説明してください。まず最初に要約や結論を短く簡潔に1～2文で示し、その後に詳細な説明や根拠、ユーザーが次に取れる具体的なアクションを順番に記載してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
+      const config = this.getGenerateContentConfig()
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config,
         contents: [prompt, audioPart]
       });
-      const text = response.text;
-      return { text, timestamp: Date.now() };
+      const result = this.extractThoughtsAndAnswer(response)
+      return { 
+        text: result.answer, 
+        thoughts: result.thoughts,
+        timestamp: Date.now() 
+      };
     } catch (error) {
       console.error("音声ファイル分析でエラーが発生しました:", error);
       throw error;
@@ -170,14 +239,16 @@ export class LLMHelper {
 
 画面の内容に基づいて、直接的で有用な分析と提案を提供してください。`;
 
+      const config = this.getGenerateContentConfig()
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config,
         contents: [prompt, imagePart]
       });
-      const text = response.text;
+      const result = this.extractThoughtsAndAnswer(response)
       
       return { 
-        text, 
+        text: result.answer, 
+        thoughts: result.thoughts,
         timestamp: Date.now(),
         type: 'auto-analysis',
         imagePath 
@@ -214,14 +285,16 @@ export class LLMHelper {
 
 画面の内容とユーザーの質問の両方を考慮して、最も有用な回答を提供してください。`;
 
+      const config = this.getGenerateContentConfig()
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config,
         contents: [prompt, imagePart]
       });
-      const text = response.text;
+      const result = this.extractThoughtsAndAnswer(response)
       
       return { 
-        text, 
+        text: result.answer, 
+        thoughts: result.thoughts,
         timestamp: Date.now(),
         type: 'prompt-analysis',
         imagePath,

@@ -195,6 +195,28 @@ export function initializeIpcHandlers(appState: AppState) {
     }
   })
 
+  // **Thinking Mode設定**
+  ipcMain.handle("set-thinking-mode", async (event, enabled: boolean) => {
+    try {
+      const llmHelper = appState.processingHelper.getLLMHelper()
+      llmHelper.setThinkingMode(enabled)
+      return { success: true, thinkingMode: enabled }
+    } catch (error: any) {
+      console.error("Error setting thinking mode:", error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle("get-thinking-mode", async () => {
+    try {
+      const llmHelper = appState.processingHelper.getLLMHelper()
+      return { success: true, thinkingMode: llmHelper.getThinkingMode() }
+    } catch (error: any) {
+      console.error("Error getting thinking mode:", error)
+      return { success: false, error: error.message }
+    }
+  })
+
   // IPC handler for processing action responses
   ipcMain.handle("process-action-response", async (event, action: string) => {
     try {
@@ -203,6 +225,28 @@ export function initializeIpcHandlers(appState: AppState) {
     } catch (error: any) {
       console.error("Error in process-action-response handler:", error)
       throw error
+    }
+  })
+
+  // **音声+スクリーンショット処理**
+  ipcMain.handle("process-voice-and-screenshot", async (event, { voiceText, screenshotPath }) => {
+    try {
+      const result = await appState.processingHelper.processVoiceAndScreenshot(voiceText, screenshotPath)
+      return { success: true, solution: result }
+    } catch (error: any) {
+      console.error("Error in process-voice-and-screenshot handler:", error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  // **音声のみ処理**
+  ipcMain.handle("process-voice-only", async (event, { voiceText }) => {
+    try {
+      const result = await appState.processingHelper.processVoiceOnly(voiceText)
+      return { success: true, solution: result }
+    } catch (error: any) {
+      console.error("Error in process-voice-only handler:", error)
+      return { success: false, error: error.message }
     }
   })
 

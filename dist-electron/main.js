@@ -192,6 +192,25 @@ function initializeIpcHandlers(appState) {
       console.error("Error toggling window:", error);
     }
   });
+  electron.ipcMain.handle("set-thinking-mode", async (event, enabled) => {
+    try {
+      const llmHelper = appState.processingHelper.getLLMHelper();
+      llmHelper.setThinkingMode(enabled);
+      return { success: true, thinkingMode: enabled };
+    } catch (error) {
+      console.error("Error setting thinking mode:", error);
+      return { success: false, error: error.message };
+    }
+  });
+  electron.ipcMain.handle("get-thinking-mode", async () => {
+    try {
+      const llmHelper = appState.processingHelper.getLLMHelper();
+      return { success: true, thinkingMode: llmHelper.getThinkingMode() };
+    } catch (error) {
+      console.error("Error getting thinking mode:", error);
+      return { success: false, error: error.message };
+    }
+  });
   electron.ipcMain.handle("process-action-response", async (event, action) => {
     try {
       await appState.processingHelper.processActionResponse(action);
@@ -199,6 +218,24 @@ function initializeIpcHandlers(appState) {
     } catch (error) {
       console.error("Error in process-action-response handler:", error);
       throw error;
+    }
+  });
+  electron.ipcMain.handle("process-voice-and-screenshot", async (event, { voiceText, screenshotPath }) => {
+    try {
+      const result = await appState.processingHelper.processVoiceAndScreenshot(voiceText, screenshotPath);
+      return { success: true, solution: result };
+    } catch (error) {
+      console.error("Error in process-voice-and-screenshot handler:", error);
+      return { success: false, error: error.message };
+    }
+  });
+  electron.ipcMain.handle("process-voice-only", async (event, { voiceText }) => {
+    try {
+      const result = await appState.processingHelper.processVoiceOnly(voiceText);
+      return { success: true, solution: result };
+    } catch (error) {
+      console.error("Error in process-voice-only handler:", error);
+      return { success: false, error: error.message };
     }
   });
   electron.ipcMain.handle("quit-app", () => electron.app.quit());
@@ -108515,6 +108552,7 @@ var ws = WebSocket2;
 class LLMHelper {
   constructor(apiKey) {
     __publicField(this, "ai");
+    __publicField(this, "thinkingMode", true);
     __publicField(this, "systemPrompt", `あなたはWingman AIです。どんな問題や状況（コーディングに限らず）でも役立つ、積極的なアシスタントです。ユーザーの入力に対して、状況を分析し、明確な問題文、関連するコンテキストを理解し、具体的な回答や解決策を直接提供してください。
 
 **重要な指示**:
@@ -108530,6 +108568,51 @@ class LLMHelper {
 
 **重要**: 回答は必ずMarkdown形式で提供してください。見出し、リスト、強調、コードブロックなどを適切に使用して、読みやすく構造化された回答を作成してください。`);
     this.ai = new node$1.GoogleGenAI({ apiKey });
+  }
+  // Thinking modeの設定
+  setThinkingMode(enabled) {
+    this.thinkingMode = enabled;
+    console.log(`🧠 Thinking mode: ${enabled ? "ON" : "OFF"}`);
+  }
+  getThinkingMode() {
+    return this.thinkingMode;
+  }
+  // AI生成の共通設定を作成
+  getGenerateContentConfig() {
+    const config2 = {
+      model: "gemini-2.5-flash-lite-preview-06-17"
+    };
+    if (this.thinkingMode) {
+      config2.config = {
+        thinkingConfig: {
+          thinking_budget: -1,
+          // 動的思考時間
+          include_thoughts: true
+          // 思考過程を含める
+        }
+      };
+    }
+    return config2;
+  }
+  // レスポンスから思考過程と回答を分離
+  extractThoughtsAndAnswer(response) {
+    var _a2, _b2, _c2;
+    if (!this.thinkingMode || !((_c2 = (_b2 = (_a2 = response.candidates) == null ? void 0 : _a2[0]) == null ? void 0 : _b2.content) == null ? void 0 : _c2.parts)) {
+      return { answer: response.text };
+    }
+    let thoughts = "";
+    let answer = "";
+    for (const part of response.candidates[0].content.parts) {
+      if (part.thought && part.text) {
+        thoughts += part.text + "\n\n";
+      } else if (part.text) {
+        answer += part.text;
+      }
+    }
+    return {
+      thoughts: thoughts.trim() || void 0,
+      answer: answer.trim() || response.text
+    };
   }
   async fileToGenerativePart(imagePath) {
     const imageData = await require$$0$1.promises.readFile(imagePath);
@@ -108569,11 +108652,13 @@ class LLMHelper {
 - クイズやテスト問題の場合は、正しい答えを直接示してください
 - 回答が複数ある場合は、最も適切な回答を選んでください
 - JSONオブジェクトのみを返してください。マークダウン形式やコードブロックは含めないでください。`;
+      const config2 = this.getGenerateContentConfig();
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config2,
         contents: [prompt, ...imageParts]
       });
-      const text = response.text;
+      const result = this.extractThoughtsAndAnswer(response);
+      const text = result.answer;
       const cleanedText = this.cleanJsonResponse(text);
       try {
         const jsonResponse = JSON.parse(cleanedText);
@@ -108598,12 +108683,17 @@ class LLMHelper {
       const prompt = `${this.systemPrompt}
 
 この音声クリップを短く簡潔に説明してください。まず最初に要約や結論を短く簡潔に1～2文で示し、その後に詳細な説明や根拠、ユーザーが次に取れる具体的なアクションを順番に記載してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答し、簡潔にしてください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
+      const config2 = this.getGenerateContentConfig();
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config2,
         contents: [prompt, audioPart]
       });
-      const text = response.text;
-      return { text, timestamp: Date.now() };
+      const result = this.extractThoughtsAndAnswer(response);
+      return {
+        text: result.answer,
+        thoughts: result.thoughts,
+        timestamp: Date.now()
+      };
     } catch (error) {
       console.error("base64からの音声分析でエラーが発生しました:", error);
       throw error;
@@ -108621,12 +108711,17 @@ class LLMHelper {
       const prompt = `${this.systemPrompt}
 
 この画像の内容を短く簡潔に説明してください。まず最初に要約や結論を短く簡潔に1～2文で示し、その後に詳細な説明や根拠、ユーザーが次に取れる具体的なアクションを順番に記載してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。構造化されたJSONオブジェクトは返さず、ユーザーに対して自然に回答してください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
+      const config2 = this.getGenerateContentConfig();
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config2,
         contents: [prompt, imagePart]
       });
-      const text = response.text;
-      return { text, timestamp: Date.now() };
+      const result = this.extractThoughtsAndAnswer(response);
+      return {
+        text: result.answer,
+        thoughts: result.thoughts,
+        timestamp: Date.now()
+      };
     } catch (error) {
       console.error("画像ファイル分析でエラーが発生しました:", error);
       throw error;
@@ -108644,12 +108739,17 @@ class LLMHelper {
       const prompt = `${this.systemPrompt}
 
 この音声ファイルを分析して内容を説明してください。まず最初に要約や結論を短く簡潔に1～2文で示し、その後に詳細な説明や根拠、ユーザーが次に取れる具体的なアクションを順番に記載してください。「自分で考えましょう」のような一般的なアドバイスは避けて、具体的で実用的な回答を提供してください。Markdown形式で見出し、リスト、強調などを使用して読みやすく構造化してください。`;
+      const config2 = this.getGenerateContentConfig();
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config2,
         contents: [prompt, audioPart]
       });
-      const text = response.text;
-      return { text, timestamp: Date.now() };
+      const result = this.extractThoughtsAndAnswer(response);
+      return {
+        text: result.answer,
+        thoughts: result.thoughts,
+        timestamp: Date.now()
+      };
     } catch (error) {
       console.error("音声ファイル分析でエラーが発生しました:", error);
       throw error;
@@ -108683,13 +108783,15 @@ class LLMHelper {
 - Markdown形式で見出し、リスト、強調を適切に使用してください
 
 画面の内容に基づいて、直接的で有用な分析と提案を提供してください。`;
+      const config2 = this.getGenerateContentConfig();
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config2,
         contents: [prompt, imagePart]
       });
-      const text = response.text;
+      const result = this.extractThoughtsAndAnswer(response);
       return {
-        text,
+        text: result.answer,
+        thoughts: result.thoughts,
         timestamp: Date.now(),
         type: "auto-analysis",
         imagePath
@@ -108723,13 +108825,15 @@ class LLMHelper {
 - Markdown形式で構造化された回答を作成してください
 
 画面の内容とユーザーの質問の両方を考慮して、最も有用な回答を提供してください。`;
+      const config2 = this.getGenerateContentConfig();
       const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        ...config2,
         contents: [prompt, imagePart]
       });
-      const text = response.text;
+      const result = this.extractThoughtsAndAnswer(response);
       return {
-        text,
+        text: result.answer,
+        thoughts: result.thoughts,
         timestamp: Date.now(),
         type: "prompt-analysis",
         imagePath,
@@ -109112,6 +109216,31 @@ class ProcessingHelper {
     } catch (error) {
       console.error("Action response processing error:", error);
       mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, error.message);
+    }
+  }
+  // **音声+スクリーンショット処理**
+  async processVoiceAndScreenshot(voiceText, screenshotPath) {
+    try {
+      return await this.llmHelper.analyzeScreenWithPrompt(screenshotPath, voiceText);
+    } catch (error) {
+      console.error("Error processing voice and screenshot:", error);
+      throw error;
+    }
+  }
+  // **音声のみ処理**
+  async processVoiceOnly(voiceText) {
+    try {
+      const response = {
+        text: `音声入力を受け取りました: "${voiceText}"
+
+画面をキャプチャして詳細な分析を行うには、スクリーンショット機能と組み合わせてください。`,
+        timestamp: Date.now(),
+        type: "voice-only"
+      };
+      return response;
+    } catch (error) {
+      console.error("Error processing voice only:", error);
+      throw error;
     }
   }
 }

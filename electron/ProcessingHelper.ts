@@ -130,4 +130,30 @@ export class ProcessingHelper {
       mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.ACTION_RESPONSE_ERROR, error.message)
     }
   }
+
+  // **音声+スクリーンショット処理**
+  public async processVoiceAndScreenshot(voiceText: string, screenshotPath: string) {
+    try {
+      return await this.llmHelper.analyzeScreenWithPrompt(screenshotPath, voiceText)
+    } catch (error: any) {
+      console.error("Error processing voice and screenshot:", error)
+      throw error
+    }
+  }
+
+  // **音声のみ処理**
+  public async processVoiceOnly(voiceText: string) {
+    try {
+      // 音声のみの場合は、テキストをそのまま分析
+      const response = {
+        text: `音声入力を受け取りました: "${voiceText}"\n\n画面をキャプチャして詳細な分析を行うには、スクリーンショット機能と組み合わせてください。`,
+        timestamp: Date.now(),
+        type: 'voice-only'
+      }
+      return response
+    } catch (error: any) {
+      console.error("Error processing voice only:", error)
+      throw error
+    }
+  }
 }

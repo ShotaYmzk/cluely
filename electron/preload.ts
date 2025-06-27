@@ -64,6 +64,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   analyzeScreenWithPrompt: (imagePath: string, prompt: string) => ipcRenderer.invoke("analyze-screen-with-prompt", imagePath, prompt),
   analyzeCurrentScreen: () => ipcRenderer.invoke("analyze-current-screen"),
 
+  // --- Thinking Mode ---
+  setThinkingMode: (enabled: boolean) => ipcRenderer.invoke("set-thinking-mode", enabled),
+  getThinkingMode: () => ipcRenderer.invoke("get-thinking-mode"),
+
   // --- Event Listeners ---
   onScreenshotTaken: (callback: (path: string) => void) => {
     const handler = (_: any, path: string) => callback(path);
