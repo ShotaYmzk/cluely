@@ -20,6 +20,8 @@ const App: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const helpButtonRef = useRef<HTMLButtonElement>(null)
+  const helpPanelRef = useRef<HTMLDivElement>(null)
 
   // 自動サイズ調整
   useEffect(() => {
@@ -221,11 +223,13 @@ const App: React.FC = () => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
+      setIsInputExpanded(false) // 送信後はAsk画面を閉じる
       handleSubmit(e as any)
     }
     if (e.key === 'Escape') {
       setIsInputExpanded(false)
       setInputValue("")
+      setShowHelp(false) // Escape時はHelpも非表示
     }
   }
 
@@ -233,23 +237,18 @@ const App: React.FC = () => {
   const handleListenToggle = async () => {
     try {
       if (isListening) {
-        const result = await window.electronAPI?.stopRecording()
-        if (result?.success) {
-          setIsListening(false)
-        }
+        await window.electronAPI?.stopRealtimeRecording()
       } else {
-        const result = await window.electronAPI?.startRecording()
-        if (result?.success) {
-          setIsListening(true)
-        }
+        await window.electronAPI?.startRealtimeRecording(true)
       }
     } catch (error) {
-      console.error("音声録音エラー:", error)
+      console.error("音声録音の切り替えエラー:", error)
     }
   }
 
   const handleAskPrompt = () => {
     setIsInputExpanded(true)
+    setShowHelp(false) // Ask画面を開くときはHelp非表示
     setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus()
@@ -259,6 +258,10 @@ const App: React.FC = () => {
 
   const handleShowHide = () => {
     window.electronAPI?.toggleWindow()
+  }
+
+  const handleQuitApp = () => {
+    window.electronAPI?.quitApp()
   }
 
   // 録音状態の監視
@@ -295,6 +298,52 @@ const App: React.FC = () => {
   // メインコンテンツが表示されているかどうか
   const hasContent = messages.length > 0 || isStreaming
 
+  // Helpパネル表示のハンドラー
+  const handleMouseEnterHelp = () => {
+    console.log('Help mouse enter')
+    setShowHelp(true)
+  }
+
+  const handleMouseLeaveHelp = () => {
+    console.log('Help mouse leave')
+    // パネル内にマウスがあるかチェック
+    setTimeout(() => {
+      const helpButton = helpButtonRef.current
+      const helpPanel = helpPanelRef.current
+      
+      if (helpButton && helpPanel) {
+        const isMouseOverButton = helpButton.matches(':hover')
+        const isMouseOverPanel = helpPanel.matches(':hover')
+        
+        if (!isMouseOverButton && !isMouseOverPanel) {
+          setShowHelp(false)
+        }
+      } else {
+        setShowHelp(false)
+      }
+    }, 100)
+  }
+
+  const handleMouseEnterPanel = () => {
+    setShowHelp(true)
+  }
+
+  const handleMouseLeavePanel = () => {
+    setTimeout(() => {
+      const helpButton = helpButtonRef.current
+      const helpPanel = helpPanelRef.current
+      
+      if (helpButton && helpPanel) {
+        const isMouseOverButton = helpButton.matches(':hover')
+        const isMouseOverPanel = helpPanel.matches(':hover')
+        
+        if (!isMouseOverButton && !isMouseOverPanel) {
+          setShowHelp(false)
+        }
+      }
+    }, 100)
+  }
+
   return (
     <div 
       ref={containerRef}
@@ -303,7 +352,7 @@ const App: React.FC = () => {
     >
       {/* 常にミニマルタブを表示 */}
       <div 
-        className="flex items-center justify-center gap-10 px-2 py-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg"
+        className="relative flex items-center justify-center gap-10 px-2 py-2 bg-black/20 backdrop-blur-md rounded-lg border border-white/10 shadow-lg"
         style={{ minWidth: '280px', maxWidth: '500px' }}
       >
         <button
@@ -330,21 +379,56 @@ const App: React.FC = () => {
           show/hide ⌘+B
         </button>
         <button 
-          onClick={() => setShowHelp(!showHelp)}
+          ref={helpButtonRef}
+          onMouseEnter={handleMouseEnterHelp}
+          onMouseLeave={handleMouseLeaveHelp}
           className="text-white/60 hover:text-white/80 text-sm transition-colors"
           style={{ cursor: 'default' }}
         >
-          help
+          help {showHelp ? '✓' : ''}
         </button>
         {showHelp && (
-          <div className="absolute top-full left-0 mt-2 p-3 bg-black/90 backdrop-blur-md rounded-lg border border-white/20 shadow-xl z-50 text-xs text-white/80 whitespace-nowrap">
-            <div className="space-y-1">
-              <div><span className="text-white/60">Command + B:</span> アプリの表示/非表示切り替え</div>
-              <div><span className="text-white/60">Command + Enter:</span> 画面分析（音声録音中なら音声+画面分析）</div>
-              <div><span className="text-white/60">Command + R:</span> チャット履歴全消去・新しいチャット開始</div>
-              <div><span className="text-white/60">Command + M:</span> 音声録音の開始/停止</div>
-              <div><span className="text-white/60">Command + H:</span> スクリーンショット撮影</div>
-              <div><span className="text-white/60">Shift + Enter:</span> 改行</div>
+          <div 
+            ref={helpPanelRef}
+            onMouseEnter={handleMouseEnterPanel}
+            onMouseLeave={handleMouseLeavePanel}
+            className="absolute top-full right-0 mt-2 p-3 bg-black/96 backdrop-blur-lg rounded-lg border border-white/25 shadow-xl z-[100] text-xs text-white/85 w-[240px]"
+          >
+            <div className="space-y-2">
+              {/* コンパクトなショートカット一覧 */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-white/75 text-xs">表示切替</span>
+                  <span className="text-blue-300 font-mono text-xs">⌘B</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white/75 text-xs">画面分析</span>
+                  <span className="text-blue-300 font-mono text-xs">⌘↩︎</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white/75 text-xs">履歴削除</span>
+                  <span className="text-blue-300 font-mono text-xs">⌘R</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white/75 text-xs">音声録音</span>
+                  <span className="text-blue-300 font-mono text-xs">⌘M</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white/75 text-xs">スクショ</span>
+                  <span className="text-blue-300 font-mono text-xs">⌘H</span>
+                </div>
+              </div>
+              
+              {/* コンパクトなQuitボタン */}
+              <div className="border-t border-white/20 pt-2 mt-3">
+                <button
+                  onClick={handleQuitApp}
+                  className="w-full px-2 py-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
+                  style={{ cursor: 'default' }}
+                >
+                  ✕ 終了
+                </button>
+              </div>
             </div>
           </div>
         )}
